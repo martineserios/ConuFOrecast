@@ -81,6 +81,7 @@ target/
 
 # exclude data, experiments, logs from source control by default
 /data/*
+/docker/db/
 !/data/tests/
 /experiments/*
 !/experiments/.gitkeep

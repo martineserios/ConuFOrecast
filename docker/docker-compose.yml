@@ -1,4 +1,4 @@
-version: '3'
+version: '3.3'
 services:
 
   jupyter:
@@ -40,3 +40,28 @@ services:
     tty: true
     env_file:
       - ../.env 
+  
+  postgres_db:
+    build:
+      context: ./db/.
+    ports:
+      - "5555:5432"
+    volumes:
+      - ./db/postgres-data:/var/lib/postgresql/data
+      - ./db:/docker-entrypoint-initdb.d
+    stdin_open: true
+    container_name: "ConuForecast_db_${USER}"
+    tty: true
+    env_file:
+      - ../.env 
+      
+#  postgre_client:
+#    image: dpage/pgadmin4
+#    ports:
+#      - "5050:5050"
+#    stdin_open: true
+#    container_name: "ConuForecast_db-client_${USER}"
+#    tty: true
+#    environment:
+#      - PGADMIN_DEFAULT_EMAIL=marios@fi.uba.ar
+#      - PGADMIN_DEFAULT_PASSWORD=1234567890

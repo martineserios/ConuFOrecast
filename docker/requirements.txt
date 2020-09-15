@@ -1,0 +1,11 @@
+psycopg2-binary
+mando>=0.6.4
+rst2ansi>=0.1.5
+tstoolbox>=100.2.0
+swmmtoolbox
+networkx
+datatable
+plotly
+dash
+pyproj
+ipykernel
