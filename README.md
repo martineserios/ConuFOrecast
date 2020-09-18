@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 ConuForecast
 ==============================
 [Put CI Badge Here]
@@ -241,3 +242,6 @@ This is the basic workflow! You can run this locally or on a cloud machine. When
 # Developer Workflow
 Continued development in this repo is straightforward.  The scaffolding is meant to be extensible -- you should add your own models, loss functions, feature engineering pipelines, etc. For brevity we are not putting information about the intended development workflow in this README. Look [here](docs/develop.md) for more information about the intended development workflow for this repo. 
 
+=======
+# ConuForecast
+>>>>>>> a26517cc1dd7a42a5f832491c2a6df1525b2f0ca
