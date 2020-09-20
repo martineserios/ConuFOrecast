@@ -5,8 +5,12 @@ import pandas as pd
 import numpy as np
 import networkx as nx
 import psycopg2
-from collections import namedtuple
 import datatable as dt
+import plotly.express as px
+
+from plotly.subplots import make_subplots
+from collections import namedtuple
+from datetime import datetime
 
 class DBconnector():
     """
@@ -40,12 +44,20 @@ class GraphInit():
         cur0.execute(time_range_query)
         time_range_query_result = cur0.fetchall()
 
-        time_range_query_result = [time for time in time_range_query_result]
+        time_range_query_result = sorted([time for time in time_range_query_result])
 
-        time_range_query_result_formatted = [time[0].strftime("%Y-%m-%d %H:%M:%S") for time in time_range_query_result]
+        time_range_query_result_formatted = sorted([time[0].strftime("%Y-%m-%d %H:%M:%S") for time in time_range_query_result])
 
         return time_range_query_result, time_range_query_result_formatted 
 
+
+    def which_time_step(self):
+        
+        time_range = self.get_time_range()[0]
+        first_two = time_range[:2]
+        time_step = (first_two[1][0] - first_two[0][0]).seconds // 60
+
+        return time_step, f'{time_step} minutes'
     
 
     def nodal_linkage_query(self, elapsed_time):
@@ -59,6 +71,7 @@ class GraphInit():
             WHERE
                 el.event_id = '{self.event}'
                 AND el.elapsed_time = '{elapsed_time}'
+                AND el.flow_rate != 0
         )
         ,
         links_conduits_model AS
@@ -97,7 +110,7 @@ class GraphInit():
         (
                 CASE
                     WHEN
-                        links.flow_rate >= 0
+                        links.flow_rate > 0
                     THEN
                         concat(conduits.from_node, '->', conduits.to_node)
                     ELSE
@@ -107,7 +120,7 @@ class GraphInit():
                 (
                     CASE
                         WHEN
-                            links.flow_rate >= 0
+                            links.flow_rate > 0
                         THEN
                             conduits.from_node
                         ELSE
@@ -138,7 +151,7 @@ class GraphInit():
         (
                 CASE
                     WHEN
-                        links.flow_rate >= 0
+                        links.flow_rate > 0
                     THEN
                         concat(orifices.from_node, '->', orifices.to_node)
                     ELSE
@@ -148,7 +161,7 @@ class GraphInit():
                 (
                     CASE
                         WHEN
-                            links.flow_rate >= 0
+                            links.flow_rate > 0
                         THEN
                             orifices.from_node
                         ELSE
@@ -179,7 +192,7 @@ class GraphInit():
         (
                 CASE
                     WHEN
-                        links.flow_rate >= 0
+                        links.flow_rate > 0
                     THEN
                         concat(weirs.from_node, '->', weirs.to_node)
                     ELSE
@@ -189,7 +202,7 @@ class GraphInit():
                 (
                     CASE
                         WHEN
-                            links.flow_rate >= 0
+                            links.flow_rate > 0
                         THEN
                             weirs.from_node
                         ELSE
@@ -318,32 +331,37 @@ class GraphInit():
         cur1.execute(nodal_linkage_query)
         nodal_linkage_query_result = cur1.fetchall()
 
-        self.nodal_linkage_query_results[self.event + '_' + elapsed_time] = nodal_linkage_query_result
+        self.nodal_linkage_query_results[f'{self.event}_{elapsed_time}'] = nodal_linkage_query_result
 
 
 
     def get_nodal_linkage(self, elapsed_time):
 
-        self.nodal_linkage_query(elapsed_time)
-            
-        nodal_linkage = {i[0]:
-                     {
-                         'link_id':i[1],
-                         'from_node':i[2],
-                         'to_node':i[3],
-                         'elapsed_time': i[4],
-                         'flow_rate':i[5],
-                         'flow_depth':i[6],
-                         'flow_velocity':i[7],
-                         'froud_number':i[8],
-                         'capacity':i[9],
-                         'length':i[10],
-                         'roughness': i[11],
-                         'rainfall':i[12],
-                         'rainfall_acc':i[13]
-                     } for i in self.nodal_linkage_query_results[self.event + '_' + elapsed_time]}
+        try:
+            self.nodal_linkage_dict[f'{self.event}_{elapsed_time}']
+            pass
+        
+        except:
+            self.nodal_linkage_query(elapsed_time)
+                
+            nodal_linkage = {i[0]:
+                        {
+                            'link_id':i[1],
+                            'from_node':i[2],
+                            'to_node':i[3],
+                            'elapsed_time': i[4],
+                            'flow_rate':i[5],
+                            'flow_depth':i[6],
+                            'flow_velocity':i[7],
+                            'froud_number':i[8],
+                            'capacity':i[9],
+                            'length':i[10],
+                            'roughness': i[11],
+                            'rainfall':i[12],
+                            'rainfall_acc':i[13]
+                        } for i in self.nodal_linkage_query_results[f'{self.event}_{elapsed_time}']}
 
-        self.nodal_linkage_dict[self.event + '_' + elapsed_time] = nodal_linkage
+            self.nodal_linkage_dict[f'{self.event}_{elapsed_time}'] = nodal_linkage
 
 
     def nodal_data_query(self, elapsed_time):
@@ -595,45 +613,50 @@ class GraphInit():
         cur2.execute(nodal_data_query)
         nodal_data_query_result = cur2.fetchall()
 
-        self.nodal_data_query_results[self.event + '_' + elapsed_time] = nodal_data_query_result
+        self.nodal_data_query_results[f'{self.event}_{elapsed_time}'] = nodal_data_query_result
 
 
 
     def get_nodal_data(self, elapsed_time):
 
-        self.nodal_data_query(elapsed_time)
-        
-        nodal_data = {i[0]: {
-        'subcatchment_id':i[1],
-        'elapsed_time':i[2],
-        'depth_above_invert':i[3],
-        'flow_lost_flooding':i[4],
-        'hydraulic_head':i[5],
-        'lateral_inflow':i[6],
-        'total_inflow':i[7],
-        'volume_stored_ponded':i[8],
-        'rainfall': i[9],
-        'evaporation_loss':i[10],
-        'runoff_rate':i[11],
-        'infiltration_loss':i[12],
-        'lon':i[13],
-        'lat':i[14],
-        'elevation':i[15],
-        'pos': (i[14], i[13]),
-        'init_depth':i[16],
-        'max_depth':i[17],
-        'area':i[18],
-        'imperv':i[19],
-        'slope':i[20],
-        'width':i[21],
-        'curb_len':i[22],
-        'raingage_id':i[23],
-        'rainfall_acc':i[24],
-        'format':i[25],
-        'unit':i[26],
-        } for i in self.nodal_data_query_results[self.event + '_' + elapsed_time]}
+        try:
+            self.nodal_data_dict[f'{self.event}_{elapsed_time}']
+            pass
 
-        self.nodal_data_dict[self.event + '_' + elapsed_time] = nodal_data
+        except:
+            self.nodal_data_query(elapsed_time)
+            
+            nodal_data = {i[0]: {
+            'subcatchment_id':i[1],
+            'elapsed_time':i[2],
+            'depth_above_invert':i[3],
+            'flow_lost_flooding':i[4],
+            'hydraulic_head':i[5],
+            'lateral_inflow':i[6],
+            'total_inflow':i[7],
+            'volume_stored_ponded':i[8],
+            'rainfall': i[9],
+            'evaporation_loss':i[10],
+            'runoff_rate':i[11],
+            'infiltration_loss':i[12],
+            'lon':i[13],
+            'lat':i[14],
+            'elevation':i[15],
+            'pos': (i[14], i[13]),
+            'init_depth':i[16],
+            'max_depth':i[17],
+            'area':i[18],
+            'imperv':i[19],
+            'slope':i[20],
+            'width':i[21],
+            'curb_len':i[22],
+            'raingage_id':i[23],
+            'rainfall_acc':i[24],
+            'format':i[25],
+            'unit':i[26],
+            } for i in self.nodal_data_query_results[f'{self.event}_{elapsed_time}']}
+
+            self.nodal_data_dict[f'{self.event}_{elapsed_time}'] = nodal_data
 
     # graph creation
 
@@ -642,14 +665,19 @@ class GraphInit():
         self.get_nodal_data(elapsed_time)
         self.get_nodal_linkage(elapsed_time)
 
-        DG = nx.DiGraph(elapsed_time = elapsed_time[1:-1], model= self.model)
-        [DG.add_edge(i[1]['from_node'], i[1]['to_node'], **i[1]) for i in self.nodal_linkage_dict[self.event + '_' + elapsed_time].items()]
-        [DG.add_node(i[0], **i[1]) for i in self.nodal_data_dict[self.event + '_' + elapsed_time].items()]
+        try:
+            self.digraphs[f'{self.event}_{elapsed_time}']
+            pass
 
-        #target definition
-        [DG.add_node(i[0], **{'target': i[1]['depth_above_invert'] > 0.2}) for i in self.nodal_data_dict[self.event + '_' + elapsed_time].items()]
+        except:
+            DG = nx.DiGraph(elapsed_time = elapsed_time[1:-1], model= self.model)
+            [DG.add_edge(i[1]['from_node'], i[1]['to_node'], **i[1]) for i in self.nodal_linkage_dict[f'{self.event}_{elapsed_time}'].items()]
+            [DG.add_node(i[0], **i[1]) for i in self.nodal_data_dict[f'{self.event}_{elapsed_time}'].items()]
 
-        self.digraphs[self.event + '_' + elapsed_time] = DG
+            #target definition
+            [DG.add_node(i[0], **{'target': i[1]['depth_above_invert'] > 0.2}) for i in self.nodal_data_dict[f'{self.event}_{elapsed_time}'].items()]
+
+            self.digraphs[f'{self.event}_{elapsed_time}'] = DG
 
 
 
@@ -726,7 +754,7 @@ class GraphInit():
         """
         attrs_dcit = {'nodes': [...], ''edges': [...]}
         """
-        pruned_digraph = self.digraphs[self.event + '_' + elapsed_time].copy()
+        pruned_digraph = self.digraphs[f'{self.event}_{elapsed_time}'].copy()
 
         for node in pruned_digraph.nodes():
             for n_attr in attrs_dict['nodes']:
@@ -743,7 +771,7 @@ class GraphInit():
         """
         attrs_dcit = {'nodes': [...], ''edges': [...]}
         """
-        pruned_digraph = self.digraphs[self.event + '_' + elapsed_time].copy()
+        pruned_digraph = self.digraphs[f'{self.event}_{elapsed_time}'].copy()
         pruned_digraph = nx.convert_node_labels_to_integers(pruned_digraph)
         
         node_attrs = list(pruned_digraph.nodes(data=True)[0].keys())
@@ -763,6 +791,7 @@ class GraphInit():
         self.model = model
         self.event = event
         self.precip = precip
+        self.build_coordinates_dict()
         self.time_range = self.get_time_range()
         self.nodal_linkage_query_results = {}
         self.nodal_linkage_dict = {}
@@ -770,7 +799,6 @@ class GraphInit():
         self.nodal_data_dict = {}
         self.digraphs = {}
         self.pos_dict = {}
-        self.build_coordinates_dict()
         self.subgraphs = {}
 
         
@@ -778,127 +806,182 @@ class GraphInit():
 
     def build_subgraph(self, node:str, acc_data:bool, elapsed_time):
         try:
-            self.digraphs[self.event + '_' + elapsed_time]
+            self.digraphs[f'{self.event}_{elapsed_time}']
+            pass
         except:
             self.build_graph(elapsed_time)
 
-        preds_list = [(i[0],i[1]) for i in nx.edge_dfs(self.digraphs[self.event + '_' + elapsed_time], node, 'reverse')]
-
-        graph_preds = nx.DiGraph(elapsed_time = elapsed_time[1:-1], model= self.model, outlet_node = node)
-
-        [graph_preds.add_edge(edge[0], edge[1], **self.nodal_linkage_dict[self.event + '_' + elapsed_time][edge[0] + '->' + edge[1]]) for edge in preds_list]
-        [graph_preds.add_node(i, **self.nodal_data_dict[self.event + '_' + elapsed_time][i]) for i in set([i[0] for i in preds_list] + [i[1] for i in preds_list])]
-
-        #target definition
-        high_risk_level = 0.25
-        mid_risk_level = 0.15
-
-        def risk_classes(level):
-            nonlocal high_risk_level
-            nonlocal mid_risk_level
-
-            if level < mid_risk_level:
-                return 0
-            elif (level >= mid_risk_level) & (level < high_risk_level):
-                return 1
-            else:
-                return 2 
-
-        [graph_preds.add_node(
-            i, **{'target': risk_classes(self.nodal_data_dict[self.event + '_' + elapsed_time][i]['depth_above_invert'])}
-            ) for i in set([i[0] for i in preds_list] + [i[1] for i in preds_list])]
-
-        if acc_data:
-            vars_acc = {
-            'area_aporte_ha': round(sum([graph_preds.nodes()[i]['area'] for i in graph_preds.nodes()]),2),
-
-            'perm_media_%':
-            round(sum(
-            [graph_preds.nodes()[i]['area'] * graph_preds.nodes()[i]['imperv']
-            for i in graph_preds.nodes()]
-            )
-            / sum([graph_preds.nodes()[i]['area'] for i in graph_preds.nodes()]),4),
-
-            'manning_medio_flow_s/m^1/3':
-            round(sum(
-            [
-            graph_preds.edges()[edge[0], edge[1]]['flow_rate']
-            * graph_preds.edges()[edge[0], edge[1]]['length']
-            * graph_preds.edges()[edge[0], edge[1]]['roughness']
-            for edge in graph_preds.edges()
-            ])
-            / sum([graph_preds.edges()[edge[0], edge[1]]['flow_rate']
-            * graph_preds.edges()[edge[0], edge[1]]['length']
-            for edge in graph_preds.edges()
-            ]),3)
-            ,
-
-            'manning_medio_s/m^1/3':
-            round(sum(
-            [
-            graph_preds.edges()[edge[0], edge[1]]['length']
-            * graph_preds.edges()[edge[0], edge[1]]['roughness']
-            for edge in graph_preds.edges()
-            ])
-            / sum([graph_preds.edges()[edge[0], edge[1]]['length']
-            for edge in graph_preds.edges()
-            ]),3)
-            ,
-
-            'precip_media_mm/ha': round(max([graph_preds.edges()[edge[0], edge[1]]['rainfall_acc'] for edge in graph_preds.edges])
-            / sum([graph_preds.nodes()[i]['area'] for i in graph_preds.nodes()]),2),
-
-            'infilt_media_mm/hs': round(np.average([graph_preds.nodes()[i]['infiltration_loss'] for i in graph_preds.nodes()]),2),
-
-            #     'vol_almacenado': round(max([graph_preds.edges()[edge[0], edge[1]]['rainfall_acc'] for edge in graph_preds.edges])
-            #         - sum([graph_preds.nodes()[i]['infiltration_loss'] for i in graph_preds.nodes])
-            #         - sum([graph_preds.nodes()[i]['evaporation_loss'] for i in graph_preds.nodes])
-            #         - sum([graph_preds.nodes()[i]['runoff_rate'] * graph_preds.nodes()[i]['area'] for i in graph_preds.nodes()]),2),
-
-            'vol_precipitado_mm_acc': round(max([graph_preds.edges()[edge[0], edge[1]]['rainfall_acc'] for edge in graph_preds.edges()]),2),
-
-            #     'vol_precipitado_mm': round(sum([graph_preds.edges()[edge[0], edge[1]]['rainfall'] for edge in graph_preds.edges()]),2),
-
-
-            'delta_h_medio_m/m':
-            round(
-            (
-            max([graph_preds.nodes()[i]['elevation'] for i in graph_preds.nodes()])
-            - min([graph_preds.nodes()[i]['elevation'] for i in graph_preds.nodes()])
-            ) / np.sqrt(10000 * sum([graph_preds.nodes()[i]['area'] for i in graph_preds.nodes()]))
-            ,2),
-
-            'pendiente_media_m/m':
-            (
-            max([graph_preds.nodes()[i]['elevation'] for i in graph_preds.nodes()])
-            - min([graph_preds.nodes()[i]['elevation'] for i in graph_preds.nodes()])
-            ) / sum([graph_preds.edges()[edge[0], edge[1]]['length'] for edge in graph_preds.edges()])
-            }
-
-
-            graph_preds.add_node(node, **vars_acc)
-
-            self.subgraphs[self.event + '_' + node +  '_' + elapsed_time + '_acc'] = graph_preds
+        try:
+            self.subgraphs[self.event + '_' + node +  '_' + elapsed_time]
+            pass
         
-        self.subgraphs[self.event + '_' + node +  '_' + elapsed_time] = graph_preds
+        except:
+            preds_list = [(i[0],i[1]) for i in nx.edge_dfs(self.digraphs[f'{self.event}_{elapsed_time}'], node, 'reverse')]
+
+            graph_preds = nx.DiGraph(elapsed_time = elapsed_time, model= self.model, outlet_node = node)
+
+            # own node data, for th cases without preds
+            graph_preds.add_node(node, **self.nodal_data_dict[f'{self.event}_{elapsed_time}'][node])
+
+            
+            [graph_preds.add_edge(edge[0], edge[1], **self.nodal_linkage_dict[f'{self.event}_{elapsed_time}'][edge[0] + '->' + edge[1]]) for edge in preds_list]
+            [graph_preds.add_node(i, **self.nodal_data_dict[f'{self.event}_{elapsed_time}'][i]) for i in set([i[0] for i in preds_list] + [i[1] for i in preds_list])]
+
+            #target definition
+            def risk_classes(level):
+                high_risk_level = 0.25
+                mid_risk_level = 0.15
+
+                if level < mid_risk_level:
+                    return 0
+                elif (level >= mid_risk_level) & (level < high_risk_level):
+                    return 1
+                else:
+                    return 2 
+
+            [graph_preds.add_node(
+                i, **{'target': risk_classes(self.nodal_data_dict[f'{self.event}_{elapsed_time}'][i]['depth_above_invert'])}
+                ) for i in set([i[0] for i in preds_list] + [i[1] for i in preds_list])]
+
+            if acc_data:
+                vars_acc = {
+                'area_aporte_ha': round(sum([graph_preds.nodes()[i]['area'] for i in graph_preds.nodes()]),2),
+
+                # 'perm_media_%':
+                # round(sum(
+                # [graph_preds.nodes()[i]['area'] * graph_preds.nodes()[i]['imperv']
+                # for i in graph_preds.nodes()]
+                # )
+                # / sum([graph_preds.nodes()[i]['area'] for i in graph_preds.nodes()]),4),
+
+                # 'manning_medio_flow_s/m^1/3':
+                # round(sum(
+                # [
+                # graph_preds.edges()[edge[0], edge[1]]['flow_rate']
+                # * graph_preds.edges()[edge[0], edge[1]]['length']
+                # * graph_preds.edges()[edge[0], edge[1]]['roughness']
+                # for edge in graph_preds.edges()
+                # ])
+                # / sum([graph_preds.edges()[edge[0], edge[1]]['flow_rate']
+                # * graph_preds.edges()[edge[0], edge[1]]['length']
+                # for edge in graph_preds.edges()
+                # ]),3),
+
+                # 'manning_medio_s/m^1/3':
+                # round(sum(
+                # [
+                # graph_preds.edges()[edge[0], edge[1]]['length']
+                # * graph_preds.edges()[edge[0], edge[1]]['roughness']
+                # for edge in graph_preds.edges()
+                # ])
+                # / sum([graph_preds.edges()[edge[0], edge[1]]['length']
+                # for edge in graph_preds.edges()
+                # ]),3),
+
+                # 'precip_media_mm/ha': round(max([graph_preds.edges()[edge[0], edge[1]]['rainfall_acc'] for edge in graph_preds.edges])
+                # / sum([graph_preds.nodes()[i]['area'] for i in graph_preds.nodes()]),2),
+
+                'infilt_media_mm/hs': round(np.average([graph_preds.nodes()[i]['infiltration_loss'] for i in graph_preds.nodes()]),2),
+
+                # 'vol_almacenado_mm': round(max([graph_preds.edges()[edge[0], edge[1]]['rainfall_acc'] for edge in graph_preds.edges])
+                #     - sum([graph_preds.nodes()[i]['infiltration_loss'] for i in graph_preds.nodes])
+                #     - sum([graph_preds.nodes()[i]['evaporation_loss'] for i in graph_preds.nodes])
+                #     - sum([graph_preds.nodes()[i]['runoff_rate'] * graph_preds.nodes()[i]['area'] for i in graph_preds.nodes()]),2),
+
+                # 'vol_precipitado_mm_acc': round(max([graph_preds.edges()[edge[0], edge[1]]['rainfall_acc'] for edge in graph_preds.edges()]),2),
+
+                #     'vol_precipitado_mm': round(sum([graph_preds.edges()[edge[0], edge[1]]['rainfall'] for edge in graph_preds.edges()]),2),
+
+
+                # 'delta_h_medio_m/m':
+                # round(
+                # (
+                # max([graph_preds.nodes()[i]['elevation'] for i in graph_preds.nodes()])
+                # - min([graph_preds.nodes()[i]['elevation'] for i in graph_preds.nodes()])
+                # ) / np.sqrt(10000 * sum([graph_preds.nodes()[i]['area'] for i in graph_preds.nodes()]))
+                # ,2),
+
+                # 'pendiente_media_m/m':
+                # (
+                # max([graph_preds.nodes()[i]['elevation'] for i in graph_preds.nodes()])
+                # - min([graph_preds.nodes()[i]['elevation'] for i in graph_preds.nodes()])
+                # ) / sum([graph_preds.edges()[edge[0], edge[1]]['length'] for edge in graph_preds.edges()])
+                }
+
+
+                graph_preds.add_node(node, **vars_acc)
+
+                self.subgraphs[self.event + '_' + node +  '_' + elapsed_time + '_acc'] = graph_preds
+            
+            self.subgraphs[self.event + '_' + node +  '_' + elapsed_time] = graph_preds
+
+
 
     def subgraphs_timeseries(self, node:str, var:str, time_step:int = 4, acc_data=True):
         [self.build_subgraph(
-            node, acc_data=True, elapsed_time=time
-            ) for time in (sorted(self.time_range[1])[3::time_step])
+            node, acc_data=acc_data, elapsed_time=time
+            ) for time in (sorted(self.time_range[1])[::time_step])
         ]
-
+        
+        if acc_data:
+            df = pd.DataFrame(
+                [(datetime.strptime(time, '%Y-%m-%d %H:%M:%S'), self.subgraphs[f'{self.event}_{node}_{time}_acc'].nodes()[node][var]
+                ) for time in (sorted(self.time_range[1])[::time_step])])\
+                    .rename({0:'elapsed_time', 1: var}, axis=1).set_index('elapsed_time')
+            return df        
         df = pd.DataFrame(
-            [(self.subgraphs[f'{self.event}_{node}_{time}_acc'].nodes()[node]['elapsed_time']
-            , self.subgraphs[f'{self.event}_{node}_{time}_acc'].nodes()[node][var]
-            ) for time in (sorted(self.time_range[1])[3::time_step])]).set_index(0)
+            [(datetime.strptime(time, '%Y-%m-%d %H:%M:%S'), self.subgraphs[f'{self.event}_{node}_{time}'].nodes()[node][var]
+            ) for time in (sorted(self.time_range[1])[::time_step])])\
+                    .rename({0:'elapsed_time', 1: var}, axis=1).set_index('elapsed_time')
+
         return df
 
 
 
+    def subgraph_tseries_viz(self, node:str, var:str, time_step:int, acc_data:bool):
+        rainfall_step = max(self.which_time_step()[0], int((self.which_time_step()[0]) * time_step))
+
+        df_plot_0 = self.subgraphs_timeseries(node, 'rainfall', time_step=time_step)
+        df_plot_0 = df_plot_0.resample(f'{rainfall_step}min').mean()
+        plot_rainfall_max = 1.5 * df_plot_0['rainfall'].max()
+
+        df_plot_1 = self.subgraphs_timeseries(node, var,time_step=time_step, acc_data=acc_data )
+        plot_var_max = 1.5 * df_plot_1[var].max()
+        splitted_var = var.split('_')
+        plot_var_legend = ' '.join([word.capitalize() for word in splitted_var][:-1]) + f' [{splitted_var[-1]}]'
+            
 
 
-    def timeseries(self, item: str, var: list):
+        subfig = make_subplots(specs=[[{"secondary_y": True}]])
+
+        # create two independent figures with px.line each containing data from multiple columns
+        fig = px.bar(df_plot_0, y='rainfall')#, render_mode="webgl",)
+        fig2 = px.line(df_plot_1, y=var)
+        fig2.update_traces(line={'width':5, 'color':'#125AEF'})
+
+
+        fig2.update_traces(yaxis="y2")
+
+
+        subfig.add_traces(fig.data + fig2.data)# + fig3.data)
+        subfig['layout']['yaxis1'].update(title='Precipitation intensity (mm/h)',range=[0, plot_rainfall_max], autorange='reversed')
+        subfig['layout']['yaxis2'].update(title= plot_var_legend, range=[0, plot_var_max], autorange=False)
+        subfig.for_each_trace(lambda t: t.update(marker=dict(color=['black'])))
+        subfig['layout']['xaxis'].update(title='', tickformat='%d-%b %Hh')
+        subfig['layout'].update(plot_bgcolor='white', font={'size':25})#, template='plotly_white')
+        subfig.update_xaxes(showline=True, linewidth=3, linecolor='black', mirror=True)
+        subfig.update_yaxes(showline=True, linewidth=3, linecolor='black', mirror=True)
+        subfig.update_xaxes(ticks="inside", tickwidth=2, tickcolor='black', ticklen=10)
+        subfig.update_yaxes(ticks="inside", tickwidth=2, tickcolor='black', ticklen=10)
+
+        subfig['layout'].update(height=600, width=1200)
+        subfig.update_layout(showlegend=False)
+
+        return subfig
+
+
+
+    def timeseries(self, item: str, var:list):
         """
         Generates the timeseries of any variable of any element.
         """
@@ -1185,6 +1268,7 @@ class GraphInit():
 
             dt_nodes = dt.Frame([i for i in map(NodeVars._make, [i for i in nodal_data_result])], names=nodal_data_cols)
 
+ 
             if len(var) == 0:
                 df = dt_nodes.to_pandas()
                 df.loc[:,'elapsed_time'] = pd.to_datetime(df.loc[:,'elapsed_time'])
@@ -1247,28 +1331,9 @@ class GraphInit():
             (
                 SELECT
                     links.link_id,
-                    (
-                        CASE
-                            WHEN
-                                links.flow_rate >= 0 
-                            THEN
-                                conduits.from_node 
-                            ELSE
-                                conduits.to_node 
-                        END
-                    )
-                    AS from_node, 
-                    (
-                        CASE
-                            WHEN
-                                links.flow_rate < 0 
-                            THEN
-                                conduits.from_node 
-                            ELSE
-                                conduits.to_node 
-                        END
-                    )
-                    AS to_node, elapsed_time, ABS(flow_rate) AS flow_rate , flow_depth, ABS(flow_velocity ) AS flow_velocity, froude_number, capacity, conduits.length, conduits.roughness 
+                    from_node,
+                    to_node,
+                    elapsed_time, flow_rate , flow_depth, flow_velocity, froude_number, capacity, conduits.length, conduits.roughness 
                 FROM
                     links_event AS links 
                     LEFT JOIN
@@ -1279,28 +1344,9 @@ class GraphInit():
                 UNION
                 SELECT
                     links.link_id,
-                    (
-                        CASE
-                            WHEN
-                                links.flow_rate >= 0 
-                            THEN
-                                orifices.from_node 
-                            ELSE
-                                orifices.to_node 
-                        END
-                    )
-                    AS from_node, 
-                    (
-                        CASE
-                            WHEN
-                                links.flow_rate < 0 
-                            THEN
-                                orifices.from_node 
-                            ELSE
-                                orifices.to_node 
-                        END
-                    )
-                    AS to_node, elapsed_time, ABS(flow_rate) AS flow_rate , flow_depth, ABS(flow_velocity ) AS flow_velocity, froude_number, capacity, 0 AS length, 0 AS roughness 
+                    from_node,
+                    to_node,
+                    elapsed_time, flow_rate , flow_depth, flow_velocity, froude_number, capacity, 0 AS length, 0 AS roughness 
                 FROM
                     links_event AS links 
                     LEFT JOIN
@@ -1311,28 +1357,9 @@ class GraphInit():
                 UNION
                 SELECT
                     links.link_id,
-                    (
-                        CASE
-                            WHEN
-                                links.flow_rate >= 0 
-                            THEN
-                                weirs.from_node 
-                            ELSE
-                                weirs.to_node 
-                        END
-                    )
-                    AS from_node, 
-                    (
-                        CASE
-                            WHEN
-                                links.flow_rate < 0 
-                            THEN
-                                weirs.from_node 
-                            ELSE
-                                weirs.to_node 
-                        END
-                    )
-                    AS to_node, elapsed_time, ABS(flow_rate) AS flow_rate , flow_depth, ABS(flow_velocity ) AS flow_velocity, froude_number, capacity, 0 AS length, 0 AS roughness 
+                    from_node,
+                    to_node,
+                    elapsed_time, flow_rate , flow_depth, flow_velocity, froude_number, capacity, 0 AS length, 0 AS roughness 
                 FROM
                     links_event AS links 
                     LEFT JOIN
@@ -1487,6 +1514,48 @@ class GraphInit():
                 df.loc[:,'elapsed_time'] = pd.to_datetime(df.loc[:,'elapsed_time'])
                 df = df.set_index('elapsed_time')
                 return df
+    
 
+    
+    def timeseries_viz(self, item:str, var:list):
+
+        df_plot_0 = self.timeseries(item, ['rainfall'])
+        plot_rainfall_max = 1.5 * df_plot_0['rainfall'].max()
+
+        df_plot_1 = self.timeseries(item, var)
+        plot_var_max = 1.5 * df_plot_1[var[0]].max()
+        splitted_var = var[0].split('_')
+        plot_var_legend = ' '.join([word.capitalize() for word in splitted_var][:-1]) + f' [{splitted_var[-1]}]'
+            
+
+
+        subfig = make_subplots(specs=[[{"secondary_y": True}]])
+
+        # create two independent figures with px.line each containing data from multiple columns
+        fig = px.bar(df_plot_0, y='rainfall')#, render_mode="webgl",)
+        fig2 = px.line(df_plot_1, y=var[0])
+        fig2.update_traces(line={'width':5, 'color':'#125AEF'})
+
+
+        fig2.update_traces(yaxis="y2")
+
+
+        subfig.add_traces(fig.data + fig2.data)# + fig3.data)
+        subfig['layout']['yaxis1'].update(title='Precipitation intensity (mm/h)',range=[0, plot_rainfall_max], autorange='reversed')
+        subfig['layout']['yaxis2'].update(title= plot_var_legend, range=[0, plot_var_max], autorange=False)
+        subfig.for_each_trace(lambda t: t.update(marker=dict(color=['black'])))
+        subfig['layout']['xaxis'].update(title='', tickformat='%d-%b %Hh')
+        subfig['layout'].update(plot_bgcolor='white', font={'size':25})#, template='plotly_white')
+        subfig.update_xaxes(showline=True, linewidth=3, linecolor='black', mirror=True)
+        subfig.update_yaxes(showline=True, linewidth=3, linecolor='black', mirror=True)
+        subfig.update_xaxes(ticks="inside", tickwidth=2, tickcolor='black', ticklen=10)
+        subfig.update_yaxes(ticks="inside", tickwidth=2, tickcolor='black', ticklen=10)
+
+        subfig['layout'].update(height=600, width=1200)
+        subfig.update_layout(showlegend=False)
+
+        return subfig
+
+        
 #%%
 # df_nodes_indiv = (pd.DataFrame(pos)).T.reset_index().rename({'index':'nodo', 'lat':'lat', 'lon':'lon'}, axis=1)

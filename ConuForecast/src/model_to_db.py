@@ -680,7 +680,7 @@ def nodes_to_dfs(model, model_id):
         coords.append(convert_coords(i[1]))
 
 
-    from pyproj import Transformer
+    # from pyproj import Transformer
 
     # def convert_coords(coord_tuple):
     #     global coords
