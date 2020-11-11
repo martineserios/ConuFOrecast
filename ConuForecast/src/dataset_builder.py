@@ -7,130 +7,23 @@ from torch.utils.data import TensorDataset, DataLoader
 from torch_geometric.data import Dataset, Data
 import networkx as nx
 import os
+import numpy as np
 import os.path as osp
 import pickle
 from collections import defaultdict
 
-
-# class GraphDataLoader(GraphManager):
-
-#     def __init__(self, attrs_dict:dict, model:str, event:str, precip:str, conn):
-#         super(GraphDataLoader, self).__init__(model, event, precip, conn)
-#         self.attrs_dict = attrs_dict
-#         self.node_attrs = attrs_dict['nodes']
-#         self.edge_attrs = attrs_dict['edges']
-#         self.graphtensors = {}
-#         self.train_DataLoaders = {}
-#         self.test_DataLoaders = {}
-
-
-
-#     def subgraph_to_torch(self, elapsed_time:str, node:str, raw_data_folder:str, detailed:bool=False, to_pickle:bool=True,):
-#         """Converts a :obj:`networkx.Graph` or :obj:`networkx.DiGraph` to a
-#         :class:`torch_geometric.data.Data` instance.
-
-#         Took it  from torch_geometric.data.Data
-
-#         Args:
-#             G (networkx.Graph or networkx.DiGraph): A networkx graph.
-#         """
-#         DG = self.build_subgraph(node=node, elapsed_time=elapsed_time, attrs=self.attrs_dict, acc_data=False, in_place=False)
-
-#         graph_ = DG.copy()
-#         graph_ = nx.convert_node_labels_to_integers(graph_)
-#         graph_ = graph_.to_directed() if not nx.is_directed(graph_) else graph_
-#         edge_index = torch.tensor(list(graph_.edges)).t().contiguous()
-
-#         torch_data = defaultdict(int)
-#         torch_data['y'] = DG.nodes()[node]['target']
-#         graph_target = torch_data['y']
-  
-#         if detailed:
-#             for i, (_, feat_dict) in enumerate(graph_.nodes(data=True)):
-#                 for key, value in feat_dict.items():
-#                     torch_data['node_' + str(key)] = [value] if i == 0 else torch_data['node_' + str(key)] + [value]
-
-#             for i, (_, _, feat_dict) in enumerate(graph_.edges(data=True)):
-#                 for key, value in feat_dict.items():
-#                     torch_data['edge_' + str(key)] = [value] if i == 0 else torch_data['edge_' + str(key)] + [value]
-        
-#         torch_data['x'] = [list(v[1].values())[4:-1] for i,v in enumerate(graph_.nodes(data=True))]
-
-#         torch_data['edge_attrs'] = [list(v[2].values())[5:] for i,v in enumerate(graph_.edges(data=True))]
-
-#         torch_data['edge_index'] = edge_index.view(2, -1)
-
-#         for key, data in torch_data.items():
-#             try:
-#                 if (key == 'x'):# | (key == 'edge_attrs'):
-#                     # torch_data[key] = torch.tensor(item)
-#                     torch_data[key] = torch.tensor(data)
-#                 elif (key == 'edge_index') | (key == 'edge_attrs'):
-#                     torch_data[key] = torch.tensor(data, dtype=torch.long)
-#                 elif (key == 'y'):
-#                     torch_data[key] = torch.tensor(data, dtype=torch.long)
-
-#             except ValueError:
-#                 print(data)
-#                 pass
-
-#         # torch_data = Data.from_dict(torch_data)
-#         # torch_data.num_nodes = graph.number_of_nodes()
-
-#         if to_pickle:
-#             # open a file, where you ant to store the data
-#             file = open(f'{raw_data_folder}/{self.event}_{elapsed_time}_{node}_{graph_target}.gpickle', 'wb')
-
-#             # dump information to that file
-#             pickle.dump(torch_data, file, pickle.HIGHEST_PROTOCOL)
-
-#             # close the file
-#             file.close()
-
-#         else:
-#             return torch_data
-      
-    # def to_DataLoader(self, elapsed_time:str, test_size=0.2,train_size=0.8, train_batch_size=32, test_batch_size=6, shuffle=True, drop_last=True, num_workers=0):
-        
-    #     try:
-    #         geometric_torch_data = self.graphtensors[f'{self.event}_{elapsed_time}']
-        
-    #     except:
-    #         self.graphto_torch(elapsed_time)
-    #         geometric_torch_data = self.graphtensors[f'{self.event}_{elapsed_time}']
-
-    #     train_D, test_D, train_L, test_L = train_test_split(
-    #         geometric_torch_data.nodes_attrs.numpy(), geometric_torch_data.target.numpy(),
-    #         test_size=test_size,train_size=train_size, shuffle=shuffle, stratify=geometric_torch_data.target.numpy()
-    #         )
-
-    #     DatasetTrain = TensorDataset(torch.from_numpy(train_D),torch.from_numpy(train_L))
-
-    #     DatasetTest = TensorDataset(torch.from_numpy(test_D),torch.from_numpy(test_L))
-
-    #     trainloader= DataLoader(
-    #         DatasetTrain, batch_size=train_batch_size, shuffle=shuffle, drop_last=drop_last, num_workers=num_workers
-    #         )
-
-    #     testloader= DataLoader(
-    #         DatasetTest, batch_size=test_batch_size, drop_last=drop_last, num_workers=num_workers
-    #         )
-
-    #     self.train_DataLotrain_DataLoadersaders[f'{self.event}_{elapsed_time}'] = trainloader
-    #     self.test_DataLoaders[f'{self.event}_{elapsed_time}'] = testloader
-
-
-
+# https://gist.github.com/YannDubs/3550259636987a7b460a200efbd6acf3
 
 class ConuGraphDataset(Dataset):
     
-    def __init__(self, root:str, time_step:int, graph_manager:GraphManager, attrs_dict:dict, clean:bool=True, transform=None, pre_transform=None):
+    def __init__(self, root:str, time_step:int, graph_manager:GraphManager, attrs_dict:dict, N:int=1000, clean:bool=True, transform=None, pre_transform=None):
         # self.elapsed_time = elapsed_time
         self.time_step = time_step
         self.target_dict = defaultdict(int)
         self.graph_manager = graph_manager
         self.clean = clean
         self.attrs_dict = attrs_dict
+        self.N = N
         super(ConuGraphDataset, self).__init__(root, transform, pre_transform)
         self.process()
         self.data = None
@@ -143,23 +36,30 @@ class ConuGraphDataset(Dataset):
     @property
     def processed_file_names(self):
         return os.listdir(osp.join(self.root, 'processed'))
+        
 
     def download(self):
         if self.clean:
             [os.remove(f'{self.raw_dir}/{file}') for file in self.raw_file_names]    
 
         graphs = self.graph_manager
-       
+        
         time_steps = (sorted(self.graph_manager.get_time_steps()[1])[::self.time_step])
+        
+        #samples by ET
+        n = self.N / len(time_steps)
+
         for time in time_steps:
             a_graph = graphs.build_digraph(time, self.attrs_dict, in_place=False)
-        # [graphs.subgraph_to_torch(self.step, node, self.raw_dir, to_pickle=True) for node in a_graph.nodes]
-        
-        # [self.subgraph_to_torch(time, node, self.raw_dir, to_pickle=True)
-        # for time in (sorted(self.graph_data_loader.get_time_steps[1])[::self.time_step])
-        # ]
+            
+            # stratified sampling
+            nodes_int_dict = {i:j['node_id'] for i,j in nx.convert_node_labels_to_integers(a_graph).nodes(True)}
+            node_int_target = np.array([j['target'] for i,j in nx.convert_node_labels_to_integers(a_graph).nodes(True)])
+            node_int_arr = np.array([i for i,j in nx.convert_node_labels_to_integers(a_graph).nodes(True)])
 
-            for node in a_graph.nodes:
+            sampled_nodes = train_test_split(node_int_arr, node_int_target, test_size= n/len(node_int_arr))
+
+            for node in [nodes_int_dict[i] for i in sampled_nodes[1]]:
                 graphs.subgraphs_to_torch_tensors(time, node, self.attrs_dict, self.raw_dir, to_pickle=True)
 
 
