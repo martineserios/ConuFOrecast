@@ -124,12 +124,13 @@ from collections import defaultdict
 
 class ConuGraphDataset(Dataset):
     
-    def __init__(self, root:str, time_step:int, graph_manager:GraphManager, clean:bool=True, transform=None, pre_transform=None):
+    def __init__(self, root:str, time_step:int, graph_manager:GraphManager, attrs_dict:dict, clean:bool=True, transform=None, pre_transform=None):
         # self.elapsed_time = elapsed_time
         self.time_step = time_step
         self.target_dict = defaultdict(int)
         self.graph_manager = graph_manager
         self.clean = clean
+        self.attrs_dict = attrs_dict
         super(ConuGraphDataset, self).__init__(root, transform, pre_transform)
         self.process()
         self.data = None
@@ -151,7 +152,7 @@ class ConuGraphDataset(Dataset):
        
         time_steps = (sorted(self.graph_manager.get_time_steps()[1])[::self.time_step])
         for time in time_steps:
-            a_graph = graphs.build_digraph(time, graphs.attrs_dict, in_place=False)
+            a_graph = graphs.build_digraph(time, self.attrs_dict, in_place=False)
         # [graphs.subgraph_to_torch(self.step, node, self.raw_dir, to_pickle=True) for node in a_graph.nodes]
         
         # [self.subgraph_to_torch(time, node, self.raw_dir, to_pickle=True)
@@ -159,7 +160,7 @@ class ConuGraphDataset(Dataset):
         # ]
 
             for node in a_graph.nodes:
-                graphs.subgraphs_to_torch_tensors(time, node, self.raw_dir, to_pickle=True)
+                graphs.subgraphs_to_torch_tensors(time, node, self.attrs_dict, self.raw_dir, to_pickle=True)
 
 
     def process(self):
