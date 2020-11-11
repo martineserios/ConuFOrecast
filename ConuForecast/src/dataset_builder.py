@@ -78,7 +78,7 @@ class ConuGraphDataset(Dataset):
             # if self.pre_transform is not None:
             #     torch_data = self.pre_transform(torch_data)
 
-            torch.save(torch_data, osp.join(self.processed_dir, f'data_{filename}.pt'))
+            torch.save(torch_data, osp.join(self.processed_dir, f'{filename}.pt'))
 
             self.target_dict[f'{filename}'] = torch_data['y']
 
