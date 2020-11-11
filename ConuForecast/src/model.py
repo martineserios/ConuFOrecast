@@ -8,7 +8,7 @@ from torch_geometric.nn import global_mean_pool
 
 #load local packages
 from ConuForecast.src.graph_utils import GraphManager, DBconnector
-from ConuForecast.src.pre_proc import GraphDataLoader, ConuGraphDataset
+from ConuForecast.src.dataset_builder import ConuGraphDataset
 
 
 class GCN(torch.nn.Module):
