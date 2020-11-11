@@ -90,35 +90,34 @@ class GraphDataLoader(GraphManager):
         else:
             return torch_data
       
-
-    def to_DataLoader(self, elapsed_time:str, test_size=0.2,train_size=0.8, train_batch_size=32, test_batch_size=6, shuffle=True, drop_last=True, num_workers=0):
+    # def to_DataLoader(self, elapsed_time:str, test_size=0.2,train_size=0.8, train_batch_size=32, test_batch_size=6, shuffle=True, drop_last=True, num_workers=0):
         
-        try:
-            geometric_torch_data = self.graphtensors[f'{self.event}_{elapsed_time}']
+    #     try:
+    #         geometric_torch_data = self.graphtensors[f'{self.event}_{elapsed_time}']
         
-        except:
-            self.graphto_torch(elapsed_time)
-            geometric_torch_data = self.graphtensors[f'{self.event}_{elapsed_time}']
+    #     except:
+    #         self.graphto_torch(elapsed_time)
+    #         geometric_torch_data = self.graphtensors[f'{self.event}_{elapsed_time}']
 
-        train_D, test_D, train_L, test_L = train_test_split(
-            geometric_torch_data.nodes_attrs.numpy(), geometric_torch_data.target.numpy(),
-            test_size=test_size,train_size=train_size, shuffle=shuffle, stratify=geometric_torch_data.target.numpy()
-            )
+    #     train_D, test_D, train_L, test_L = train_test_split(
+    #         geometric_torch_data.nodes_attrs.numpy(), geometric_torch_data.target.numpy(),
+    #         test_size=test_size,train_size=train_size, shuffle=shuffle, stratify=geometric_torch_data.target.numpy()
+    #         )
 
-        DatasetTrain = TensorDataset(torch.from_numpy(train_D),torch.from_numpy(train_L))
+    #     DatasetTrain = TensorDataset(torch.from_numpy(train_D),torch.from_numpy(train_L))
 
-        DatasetTest = TensorDataset(torch.from_numpy(test_D),torch.from_numpy(test_L))
+    #     DatasetTest = TensorDataset(torch.from_numpy(test_D),torch.from_numpy(test_L))
 
-        trainloader= DataLoader(
-            DatasetTrain, batch_size=train_batch_size, shuffle=shuffle, drop_last=drop_last, num_workers=num_workers
-            )
+    #     trainloader= DataLoader(
+    #         DatasetTrain, batch_size=train_batch_size, shuffle=shuffle, drop_last=drop_last, num_workers=num_workers
+    #         )
 
-        testloader= DataLoader(
-            DatasetTest, batch_size=test_batch_size, drop_last=drop_last, num_workers=num_workers
-            )
+    #     testloader= DataLoader(
+    #         DatasetTest, batch_size=test_batch_size, drop_last=drop_last, num_workers=num_workers
+    #         )
 
-        self.train_DataLotrain_DataLoadersaders[f'{self.event}_{elapsed_time}'] = trainloader
-        self.test_DataLoaders[f'{self.event}_{elapsed_time}'] = testloader
+    #     self.train_DataLotrain_DataLoadersaders[f'{self.event}_{elapsed_time}'] = trainloader
+    #     self.test_DataLoaders[f'{self.event}_{elapsed_time}'] = testloader
 
 
 
@@ -185,29 +184,3 @@ class ConuGraphDataset(Dataset):
     def num_classes(self):
         r"""The number of classes in the dataset."""
         return len(set(j.item() for i,j in self.target_dict.items()))
-
-
-
-    # def train_test_split(self, elapsed_time:str, test_size=0.2,train_size=0.8, train_batch_size=32, test_batch_size=6, shuffle=True, drop_last=True, num_workers=0):
-        
-
-
-    #     train_D, test_D, train_L, test_L = train_test_split(
-    #         geometric_torch_data.nodes_attrs.numpy(), geometric_torch_data.target.numpy(),
-    #         test_size=test_size,train_size=train_size, shuffle=shuffle, stratify=geometric_torch_data.target.numpy()
-    #         )
-
-    #     DatasetTrain = TensorDataset(torch.from_numpy(train_D),torch.from_numpy(train_L))
-
-    #     DatasetTest = TensorDataset(torch.from_numpy(test_D),torch.from_numpy(test_L))
-
-    #     trainloader= DataLoader(
-    #         DatasetTrain, batch_size=train_batch_size, shuffle=shuffle, drop_last=drop_last, num_workers=num_workers
-    #         )
-
-    #     testloader= DataLoader(
-    #         DatasetTest, batch_size=test_batch_size, drop_last=drop_last, num_workers=num_workers
-    #         )
-
-    #     self.train_DataLotrain_DataLoadersaders[f'{self.event}_{elapsed_time}'] = trainloader
-    #     self.test_DataLoaders[f'{self.event}_{elapsed_time}'] = testloader
