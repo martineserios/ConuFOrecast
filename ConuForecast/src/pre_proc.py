@@ -79,7 +79,7 @@ class GraphDataLoader(GraphManager):
 
         if to_pickle:
             # open a file, where you ant to store the data
-            file = open(f'{raw_data_folder}/{self.event}_{node}_{elapsed_time}_{graph_target}.gpickle', 'wb')
+            file = open(f'{raw_data_folder}/{self.event}_{elapsed_time}_{node}_{graph_target}.gpickle', 'wb')
 
             # dump information to that file
             pickle.dump(torch_data, file, pickle.HIGHEST_PROTOCOL)
@@ -124,8 +124,9 @@ class GraphDataLoader(GraphManager):
 
 class ConuGraphDataset(Dataset):
     
-    def __init__(self, root:str, elapsed_time:str, graph_data_loader:GraphDataLoader, clean:bool=True, transform=None, pre_transform=None):
-        self.elapsed_time = elapsed_time
+    def __init__(self, root:str, time_step:int, graph_data_loader:GraphDataLoader, clean:bool=True, transform=None, pre_transform=None):
+        # self.elapsed_time = elapsed_time
+        self.time_step = time_step
         self.target_dict = defaultdict(int)
         self.graph_data_loader = graph_data_loader
         self.clean = clean
@@ -147,8 +148,19 @@ class ConuGraphDataset(Dataset):
             [os.remove(f'{self.raw_dir}/{file}') for file in self.raw_file_names]    
 
         graphs = self.graph_data_loader
-        a_graph = graphs.build_digraph(self.elapsed_time, graphs.attrs_dict, in_place=False)
-        [graphs.subgraph_to_torch(self.elapsed_time, node, self.raw_dir, to_pickle=True) for node in a_graph.nodes]
+       
+        time_steps = (sorted(self.graph_data_loader.get_time_steps()[1])[::self.time_step])
+        for time in time_steps:
+            a_graph = graphs.build_digraph(time, graphs.attrs_dict, in_place=False)
+        # [graphs.subgraph_to_torch(self.step, node, self.raw_dir, to_pickle=True) for node in a_graph.nodes]
+        
+        # [self.subgraph_to_torch(time, node, self.raw_dir, to_pickle=True)
+        # for time in (sorted(self.graph_data_loader.get_time_steps[1])[::self.time_step])
+        # ]
+
+            for node in a_graph.nodes:
+                graphs.subgraph_to_torch(time, node, self.raw_dir, to_pickle=True)
+
 
     def process(self):
 
