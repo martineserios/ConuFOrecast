@@ -25,7 +25,7 @@ event_id = input('4-digit event_id like: 0123:    ')
 epsg_modelo = input('EPSG (ejemplo: 5348):    ')
 
 project_folder = os.path.abspath(os.path.join(os.getcwd(),"../.."))
-data_raw_folder = os.path.join(project_folder,'data', 'salidas-modelo')
+data_raw_folder = os.path.join(project_folder,'data', 'raw_swmm')
 event_folder = os.path.join(data_raw_folder, 'Run_[' + event_id + ']')
 model_inp = os.path.join(event_folder, 'model.inp')
 model_out = os.path.join(event_folder, 'model.out')
@@ -46,7 +46,7 @@ RELEVANT_GROUP_TYPES_INP = [
             'coordinates',
             'subcatchments',
             'raingages',
-            'conduits', 
+            'conduits',
             'orifices',
             'weirs',
             'outfalls',
@@ -100,7 +100,7 @@ RELEVANT_LINKS = [
             # 'conduit40724',
             # 'conduit13927'
         ]
-        
+
 RELEVANT_SUBCATCHMENTS = []
 
 RELEVANT_NODES = []
@@ -224,7 +224,7 @@ MODEL_INP_COLS = {
         "s_imperv",
         "s_perv",
         "pct_zero",
-        "route_to" 
+        "route_to"
     ],
     "NODES_STORAGE" : [
         "storage_id",
@@ -242,7 +242,7 @@ MODEL_INP_COLS = {
         "type",
         # "stage_data",
         "gated",
-        # "route_to" 
+        # "route_to"
     ],
     "NODES_JUNCTIONS" : [
         "junction_id",
@@ -250,7 +250,7 @@ MODEL_INP_COLS = {
         "max_depth",
         "init_depth",
         "sur_depth",
-        "aponded" 
+        "aponded"
     ],
     "INFILTRATION": [
         "subcatchment_id",
@@ -338,7 +338,7 @@ def group_start_line(model):
 
     groups['nodes_coordinates'] = groups.pop('coordinates')
 
-        
+
     return groups
 
 
@@ -352,21 +352,21 @@ def build_groups_dicts(model):
         start = start_dict['start']
 
         with open(model, 'r') as inp:
-            lines = inp.readlines()        
+            lines = inp.readlines()
             for index, line in enumerate(lines):
                 if (index - start == 1) & (';;' in line) & (';;--' not in line):
                     groups[element].update({'header':[col for col in re.split("\s\s+", line[2:-1]) if len(col) > 1]})
 
                 elif (index - start == 2) & (';;--------------' in line):
                     groups[element].update({'line_to_skip': index})
-                
+
                 elif (index - start == 3):
                     break
-                    
-    
+
+
     # some corrrections on header because of mismatches on inp file
 
-    # groups['properties'].update({'header': MODEL_INP_COLS['PROPERTIES']})    
+    # groups['properties'].update({'header': MODEL_INP_COLS['PROPERTIES']})
     groups['subcatchments'].update({'header': MODEL_INP_COLS['SUBCATCHMENTS']})
     groups['subareas'].update({'header': MODEL_INP_COLS['SUBAREAS']})
     groups['infiltration'].update({'header': MODEL_INP_COLS['INFILTRATION']})
@@ -377,7 +377,7 @@ def build_groups_dicts(model):
     groups['nodes_outfalls'].update({'header': MODEL_INP_COLS['NODES_OUTFALLS']})
     groups['nodes_storage'].update({'header': MODEL_INP_COLS['NODES_STORAGE']})
     groups['nodes_junctions'].update({'header': MODEL_INP_COLS['NODES_JUNCTIONS']})
-    
+
     return groups
 
 # %%
@@ -405,9 +405,9 @@ def raingages_meta_to_dfs(model, model_id):
                     # elif i == start + 1:
                     #     headers = line
                     else:
-                        formatted_line = [line[0].split()[0], line[0].split()[1], line[0].split()[2],line[0].split()[7]] 
+                        formatted_line = [line[0].split()[0], line[0].split()[1], line[0].split()[2],line[0].split()[7]]
                         contents.append(formatted_line)
-                            
+
     df = pd.DataFrame(data = contents, columns= header,)
     df['interval'] = df['interval'].map( lambda x: datetime.strptime(x, '%H:%M'))
     df.insert(0, 'precipitation_id', precipitation_id)
@@ -424,17 +424,17 @@ def date_parser(line):
     minute = line[0].split()[5].zfill(2)
 
     str_date = '-'.join([year, month, day, hour, minute] )
-    
+
     date_format = '%Y-%m-%d-%H-%M'
     return datetime.strptime(str_date, date_format)
 
 # %%
 def raingages_to_df(event_folder, event_id, model, model_id):
-    contents = []  
+    contents = []
 
     for file in list_files(event_folder, 'txt', 'P'):
         raingage_id = file.split('.')[0]
-   
+
         with open(os.path.join(event_folder, file), newline='') as f:
             r = csv.reader(f)
             for i, line in enumerate(r):
@@ -449,25 +449,25 @@ def raingages_to_df(event_folder, event_id, model, model_id):
                     print('error')
     df_timeseries = pd.DataFrame(data = contents, columns= ['raingage_id', 'elapsed_time', 'value'])
     df_timeseries.insert(0, 'precipitation_id', precipitation_id)
-   
+
     df_metadata = raingages_meta_to_dfs(model, model_id)
     return df_metadata, df_timeseries
 # %%
 
 def load_raingages_to_db(event_folder, event_id, model, model_id):
     raingage_metadata, raingage_timeseries = raingages_to_df(event_folder, event_id, model, model_id)
-    
+
     table_metadata = 'raingages_metadata'
     table_timeseries = 'raingages_timeseries'
-    
+
     try:
         raingage_metadata.to_sql(table_metadata, engine_base_ina, index=False, if_exists='append')
-    except:
-        None
+    except Exception as e:
+        print(e)
     try:
         raingage_timeseries.to_sql(table_timeseries, engine_base_ina, index=False, if_exists='append')
-    except:
-        None
+    except Exception as e:
+        print(e)
 
 # def group_type_to_dfs(model, model_id, group, id_col, col_to_check, own_relevant__list, relevant_dependent_list):
 #     """ Read a .CSV into a Pandas DataFrame until a blank line is found, then stop.
@@ -498,7 +498,7 @@ def load_raingages_to_db(event_folder, event_id, model, model_id):
 #                             if line[0].split()[col_to_check].lower() in relevant_dependent_list:
 #                                 own_relevant__list.append(line[0].split()[id_col])
 #                                 contents.append(line[0].split())
-                            
+
 #     df = pd.DataFrame(data = contents, columns= [col.lower().replace("-", "_").replace("%", "").replace(" ", "_") for col in header],)
 #     df.insert(0, 'model_id', model_id)
 #     print(group,'df created!')
@@ -539,7 +539,7 @@ def conduits_to_dfs(model, model_id):
                             if line[0].split()[0].lower() in RELEVANT_LINKS:
                                 RELEVANT_LINKS_CONDUITS.append(line[0].split()[0])
                                 contents.append(line[0].split())
-                            
+
     df = pd.DataFrame(data = contents, columns= [col.lower().replace("-", "_").replace("%", "").replace(" ", "_") for col in header],)
     df.insert(0, 'model_id', model_id)
     print('conduits','df created!')
@@ -573,7 +573,7 @@ def weirs_to_dfs(model, model_id):
                             if line[0].split()[0].lower() in RELEVANT_LINKS:
                                 RELEVANT_LINKS_WEIRS.append(line[0].split()[0])
                                 contents.append(line[0].split())
-                            
+
     df = pd.DataFrame(data = contents, columns= [col.lower().replace("-", "_").replace("%", "").replace(" ", "_") for col in header],)
     df.insert(0, 'model_id', model_id)
     print('weirs','df created!')
@@ -608,7 +608,7 @@ def orifices_to_dfs(model, model_id):
                             if line[0].split()[0].lower() in RELEVANT_LINKS:
                                 RELEVANT_LINKS_ORIFICES.append(line[0].split()[0])
                                 contents.append(line[0].split())
-                            
+
     df = pd.DataFrame(data = contents, columns= [col.lower().replace("-", "_").replace("%", "").replace(" ", "_") for col in header],)
     df.insert(0, 'model_id', model_id)
     print('orifices','df created!')
@@ -625,20 +625,23 @@ def get_nodes_from_links(model, model_id):
         conduits_df,
         orifices_df,
         weirs_df
-    ]    
+    ]
 
     nodes = []
     for df in links_dfs:
         for col in [col for col in df.columns if 'node' in col]:
             nodes += df[col].unique().tolist()
-    
+
     return nodes
 
 #cambio de coordenadas
 def convert_coords(coord_tuple):
-    transformer = pyproj.Transformer.from_crs(crs_from='epsg:5348', crs_to='epsg:4326')
+    transformer = pyproj.Transformer.from_crs(crs_from='epsg:' + epsg_modelo, crs_to='epsg:4326')
     lon, lat = transformer.transform(coord_tuple[0], coord_tuple[1])
     return (lon,lat)
+
+
+
 
 def nodes_to_dfs(model, model_id):
     """ Read a .CSV into a Pandas DataFrame until a blank line is found, then stop.
@@ -661,28 +664,49 @@ def nodes_to_dfs(model, model_id):
                         break
                     # elif (i == start + 1):
                     #     headers = line
-                        
+
                     else:
                         if len(RELEVANT_NODES) == 0:
                             contents.append(line[0].split())
                         else:
                             if line[0].split()[0] in RELEVANT_NODES:
                                 contents.append(line[0].split())
-                            
+
 
     df = pd.DataFrame(data = contents, columns= [col.lower().replace("-", "_").replace("%", "").replace(" ", "_") for col in header],)
     df.insert(0, 'model_id', model_id)
 
+    df = coords_to_df(df)
+
+    return df
+
+def coords_to_df(model, model_id):
+
+    # df = nodes_to_dfs(model, model_id)
+
     cols =['lat', 'lon']
     coords = []
 
-    for i in df[['x_coord', 'y_coord']].iterrows():
-        coords.append(convert_coords(i[1]))
+    from pyproj import Transformer
+    import concurrent.futures
+
+    def convert_coords(coord_tuple):
+        nonlocal coords
+        transformer = Transformer.from_crs(crs_from='epsg:5348' , crs_to='epsg:4326')
+        lon, lat = transformer.transform(coord_tuple[0], coord_tuple[1])
+        coords.append((lon, lat))# coord_tuple[2]))
+
+    print ('hola')
+
+    coordinates = [(j[0], j[1]) for i,j in df[['x_coord', 'y_coord']].iterrows()]
+    with concurrent.futures.ProcessPoolExecutor(max_workers=8) as executor:
+        [executor.submit(convert_coords, coordinate) for coordinate in coordinates]
 
     df = pd.concat([df, pd.DataFrame(coords, columns=cols)], axis=1)
 
     print('nodes','df created!')
     return df
+
 
 
 def outfalls_to_dfs(model, model_id):
@@ -706,14 +730,14 @@ def outfalls_to_dfs(model, model_id):
                         break
                     # elif (i == start + 1):
                     #     headers = line
-                        
+
                     else:
                         if len(RELEVANT_NODES) == 0:
                             contents.append(line[0].split())
                         else:
                             if line[0].split()[0] in RELEVANT_NODES:
                                 contents.append(line[0].split())
-                            
+
 
     df = pd.DataFrame(data = contents, columns= [col.lower().replace("-", "_").replace("%", "").replace(" ", "_") for col in header],)
     df.insert(0, 'model_id', model_id)
@@ -743,14 +767,14 @@ def junctions_to_dfs(model, model_id):
                         break
                     # elif (i == start + 1):
                     #     headers = line
-                        
+
                     else:
                         if len(RELEVANT_NODES) == 0:
                             contents.append(line[0].split())
                         else:
                             if line[0].split()[0] in RELEVANT_NODES:
                                 contents.append(line[0].split())
-                            
+
 
     df = pd.DataFrame(data = contents, columns= [col.lower().replace("-", "_").replace("%", "").replace(" ", "_") for col in header],)
     df.insert(0, 'model_id', model_id)
@@ -780,14 +804,14 @@ def storage_to_dfs(model, model_id):
                         break
                     # elif (i == start + 1):
                     #     headers = line
-                        
+
                     else:
                         if len(RELEVANT_NODES) == 0:
                             contents.append(line[0].split())
                         else:
                             if line[0].split()[0] in RELEVANT_NODES:
                                 contents.append(line[0].split())
-                            
+
 
     df = pd.DataFrame(data = contents, columns= [col.lower().replace("-", "_").replace("%", "").replace(" ", "_") for col in header],)
     df.insert(0, 'model_id', model_id)
@@ -822,7 +846,7 @@ def subcatch_to_dfs(model, model_id):
                         relevant_nodes = [node for node in RELEVANT_NODES]
                         if len(relevant_nodes) == 0:
                             contents.append(line[0].split())
-                        else: 
+                        else:
                             if line[0].split()[2] in relevant_nodes:
                                 RELEVANT_SUBCATCHMENTS.append(line[0].split()[0])
                                 contents.append(line[0].split())
@@ -856,7 +880,7 @@ def infiltration_to_dfs(model, model_id):
                         relevant_nodes = [node for node in RELEVANT_NODES]
                         if len(relevant_nodes) == 0:
                             contents.append(line[0].split())
-                        else: 
+                        else:
                             if line[0].split()[2] in relevant_nodes:
                                 contents.append(line[0].split())
 
@@ -889,7 +913,7 @@ def subareas_to_dfs(model, model_id):
                         relevant_nodes = [node for node in RELEVANT_NODES]
                         if len(relevant_nodes) == 0:
                             contents.append(line[0].split())
-                        else: 
+                        else:
                             if line[0].split()[2] in relevant_nodes:
                                 contents.append(line[0].split())
 
@@ -904,14 +928,14 @@ def subareas_to_dfs(model, model_id):
 # functions for interactions with the db
 def df_to_db(df, engine, table, if_exists):
     if update_model:
-        
+
         session_factory = sessionmaker(bind=engine_base_ina)
         Session = scoped_session(session_factory)
 
         df.to_sql(table, engine, index=False, if_exists=if_exists)
-        
+
         Session.remove()
-        
+
         print(elements,'to database!')
 
 def query_to_db(engine, query):
@@ -1051,6 +1075,58 @@ def inp_to_db(model, model_id, engine):
             print('Listo subcatch!')
 
 
+# def time_series_vars_to_db(model_out, tipo, evento, conn, sub_set, cols_tipo):
+#     """ Esta función genera un diccionario con todas las series temporales del modelo para una tipo.
+#         El diccionario tiene la siguiente estructura:
+#             {tipo :
+#                 {parte:
+#                     {variable: serie}
+#                 }
+#             }
+#         Argumentos:
+#             model.out: el archivo .out que devuelve swmm
+#             tipo: str --> The type are "subcatchment", "node", "link", "pollutant", "system".
+#             evento: ID del evento
+#         Return:
+#             dicc
+#             # hace un insert en la base de datos
+#     """
+#     series = {tipo: {}}
+#     partes = set([item[1] for item in swmm.catalog(model_out) if item[0] == tipo])
+
+#     if len(sub_set) == 0:
+#         partes = [parte for parte in partes]
+#     else:
+#         partes = [parte for parte in partes if parte in sub_set]
+#     print('Cantidad de partes:', len(partes), partes)
+#     count = 0
+
+#     for parte in partes:
+#         series_df = swmm.extract(model_out, tipo + ',' + parte + ',')
+#         series_df.columns = [col[len(tipo + '_' + parte + '_'):].lower() for col in series_df.columns]
+#         series_df.reset_index(inplace=True)
+#         series_df = series_df.rename({'index':'elapsed_time'}, axis=1)
+#         series_df[tipo + '_id'] = parte
+#         series_df['event_id'] = evento
+#         series_df = series_df[cols_tipo]
+
+#         series.get(tipo).update({parte: series_df})
+#         print(tipo, parte)
+
+#         tabla = 'events_' + tipo + 's'
+
+
+#         engine_base_ina.dispose()
+#         series.get(tipo).get(parte).to_sql(tabla, conn, index=False, if_exists='append')
+
+
+#         count += 1
+#         print(tipo + ': ' + str(count) + ' de ' + str(len(partes)))
+
+#     return series
+
+
+
 def time_series_vars_to_db(model_out, tipo, evento, conn, sub_set, cols_tipo):
     """ Esta función genera un diccionario con todas las series temporales del modelo para una tipo.
         El diccionario tiene la siguiente estructura:
@@ -1076,11 +1152,9 @@ def time_series_vars_to_db(model_out, tipo, evento, conn, sub_set, cols_tipo):
         partes = [parte for parte in partes if parte in sub_set]
     print('Cantidad de partes:', len(partes), partes)
     count = 0
-    
 
+    def load_vars(parte, model_out, tipo, evento, conn, sub_set, cols_tipo):
 
-
-    def to_db(parte):       
         series_df = swmm.extract(model_out, tipo + ',' + parte + ',')
         series_df.columns = [col[len(tipo + '_' + parte + '_'):].lower() for col in series_df.columns]
         series_df.reset_index(inplace=True)
@@ -1088,55 +1162,78 @@ def time_series_vars_to_db(model_out, tipo, evento, conn, sub_set, cols_tipo):
         series_df[tipo + '_id'] = parte
         series_df['event_id'] = evento
         series_df = series_df[cols_tipo]
-        
+
         series.get(tipo).update({parte: series_df})
         print(tipo, parte)
 
         tabla = 'events_' + tipo + 's'
 
-        session_factory = sessionmaker(bind=engine_base_ina)
-        Session = scoped_session(session_factory)
 
+        engine_base_ina.dispose()
         series.get(tipo).get(parte).to_sql(tabla, conn, index=False, if_exists='append')
 
-        Session.remove()
 
         count += 1
         print(tipo + ': ' + str(count) + ' de ' + str(len(partes)))
 
-    from multiprocessing import Queue
-    queue = Queue()
+        # return series
 
+    import multiprocessing
+    processes = []
     for parte in partes:
-        queue.put(multiprocessing.Process(target=to_db, args=(parte)))
-        
-    for i in range(4):
-        qu.append(t)
-        t.start()
+        t = multiprocessing.Process(target=load_vars, args=(parte, model_out, tipo, evento, engine_base_ina, sub_set, cols_tipo))
+        processes.append(t)
+        # t.start()
+
+    for process in processes:
+        process.start()
 
 
-def out_to_db(model_out, event, engine):
+    for process in processes:
+        process.join()
+    
+
+
+
+
+
+
+# def out_to_db(model_out, event, engine):
+#     for tipo in RELEVANT_GROUP_TYPES_OUT:
+#         if tipo == 'link':
+#             time_series_vars_to_db(model_out, tipo, event, engine, RELEVANT_LINKS, MODEL_OUT_COLS['LINKS_COLS'])
+#         elif tipo == 'node':
+#             time_series_vars_to_db(model_out, tipo, event, engine, RELEVANT_NODES, MODEL_OUT_COLS['NODES_COLS'])
+#         elif tipo == 'subcatchment':
+#             time_series_vars_to_db(model_out, tipo, event, engine, RELEVANT_SUBCATCHMENTS, MODEL_OUT_COLS['SUBCATCHMENTS_COLS'])
+
+
+def out_to_db(tipo, model_out, event, engine):
+    if tipo == 'link':
+        time_series_vars_to_db(model_out, tipo, event, engine, RELEVANT_LINKS, MODEL_OUT_COLS['LINKS_COLS'])
+    elif tipo == 'node':
+        time_series_vars_to_db(model_out, tipo, event, engine, RELEVANT_NODES, MODEL_OUT_COLS['NODES_COLS'])
+    elif tipo == 'subcatchment':
+        time_series_vars_to_db(model_out, tipo, event, engine, RELEVANT_SUBCATCHMENTS, MODEL_OUT_COLS['SUBCATCHMENTS_COLS'])
+
+
+def multi_proc(model_out, event, engine):
+    import multiprocessing
+    processes = []
     for tipo in RELEVANT_GROUP_TYPES_OUT:
-        if tipo == 'link':
-            time_series_vars_to_db(model_out, tipo, event, engine, RELEVANT_LINKS, MODEL_OUT_COLS['LINKS_COLS'])
-        elif tipo == 'node':
-            time_series_vars_to_db(model_out, tipo, event, engine, RELEVANT_NODES, MODEL_OUT_COLS['NODES_COLS'])
-        elif tipo == 'subcatchment':
-            time_series_vars_to_db(model_out, tipo, event, engine, RELEVANT_SUBCATCHMENTS, MODEL_OUT_COLS['SUBCATCHMENTS_COLS'])
+        t = multiprocessing.Process(target=out_to_db, args=(tipo, model_out, event, engine_base_ina))
+        processes.append(t)
+        # t.start()
+
+    for process in processes:
+        process.start()
 
 
-# def multi_proc(model_out, event, engine):
-#     processes = []
+    for process in processes:
+        process.join()
 
-#     with Pool(processes=3) as pool:
-#         for tipo in RELEVANT_GROUP_TYPES_OUT:
-#             processes = pool.imap_unordered(out_to_db, (tipo, model_out, event, engine_base_ina))
-#     #         p.start()
-        
-    # for process in processes:
-    #     process.join()
-
-
+# if __name__ == '__main__':
+#     main(model_inp, model_id)
 
 if __name__ == "__main__":
 
@@ -1154,8 +1251,8 @@ if __name__ == "__main__":
         # update_model = False
         print('precipitation already loaded!')
 
-    # load_raingages_to_db(event_folder, event_id, model_inp, model_id)
-    
+    load_raingages_to_db(event_folder, event_id, model_inp, model_id)
+
     try:
         query_to_db(engine_base_ina, "INSERT INTO models(model_id) VALUES('{}')".format(model_id))
     except Exception as e:
@@ -1168,14 +1265,12 @@ if __name__ == "__main__":
         print('Event, model and raingage already loaded!')
 
     groups = {}
-    
+
     elements =  group_start_line(model_inp).keys()
-    
+
     # inp_to_db(model_inp, model_id, engine_base_ina)
 
-    out_to_db(model_out, event_id, engine_base_ina)
+    multi_proc(model_out, event_id, engine_base_ina) 
 
     print('Listo todo!')
     print('That took {} seconds'.format(time.time() - starttime))
-    
-    

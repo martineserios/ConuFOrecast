@@ -55,7 +55,7 @@ services:
     env_file:
       - ../.env 
       
-#  postgre_client:
+#  postgres_client:
 #    image: dpage/pgadmin4
 #    ports:
 #      - "5050:5050"

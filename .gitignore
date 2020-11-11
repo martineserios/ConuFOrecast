@@ -81,6 +81,8 @@ target/
 
 # exclude data, experiments, logs from source control by default
 /data/*
+/data2/*
+/data3/*
 /docker/db/
 !/data/tests/
 /experiments/*

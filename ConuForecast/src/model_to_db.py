@@ -25,7 +25,7 @@ event_id = input('4-digit event_id like: 0123:    ')
 epsg_modelo = input('EPSG (ejemplo: 5348):    ')
 
 project_folder = os.path.abspath(os.path.join(os.getcwd(),"../.."))
-data_raw_folder = os.path.join(project_folder,'data', 'salidas-modelo')
+data_raw_folder = os.path.join(project_folder,'data', 'raw')
 event_folder = os.path.join(data_raw_folder, 'Run_[' + event_id + ']')
 model_inp = os.path.join(event_folder, 'model.inp')
 model_out = os.path.join(event_folder, 'model.out')
@@ -36,8 +36,8 @@ engine_base_ina = create_engine('postgresql://postgres:postgres@172.18.0.1:5555/
 
 
 RELEVANT_GROUP_TYPES_OUT = [
-            # 'link',
-            # 'node',
+            'link',
+            'node',
             'subcatchment',
             # 'system'
             ]
@@ -1114,12 +1114,12 @@ def time_series_vars_to_db(model_out, tipo, evento, conn, sub_set, cols_tipo):
 
         tabla = 'events_' + tipo + 's'
 
-        session_factory = sessionmaker(bind=engine_base_ina)
-        Session = scoped_session(session_factory)
-
+        # session_factory = sessionmaker(bind=engine_base_ina)
+        # Session = scoped_session(session_factory)
+        engine_base_ina.dispose()
         series.get(tipo).get(parte).to_sql(tabla, conn, index=False, if_exists='append')
 
-        Session.remove()
+        # Session.remove()
 
         count += 1
         print(tipo + ': ' + str(count) + ' de ' + str(len(partes)))
@@ -1193,9 +1193,9 @@ if __name__ == "__main__":
 
     elements =  group_start_line(model_inp).keys()
 
-    # inp_to_db(model_inp, model_id, engine_base_ina)
+    inp_to_db(model_inp, model_id, engine_base_ina)
 
-    # out_to_db(model_out, event_id, engine_base_ina) 
+    out_to_db(model_out, event_id, engine_base_ina) 
 
     print('Listo todo!')
     print('That took {} seconds'.format(time.time() - starttime))
