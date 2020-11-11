@@ -702,6 +702,10 @@ class GraphManager():
 
                 if in_place:
                     self.digraphs[f'{self.event}_{elapsed_time}'] = DG
+                    self.num_nodes[f'{self.event}_{elapsed_time}'] = len(DG.nodes())
+                    self.num_edges[f'{self.event}_{elapsed_time}'] = len(DG.edges())
+
+
         
         else:
             nodal_data = self.get_nodal_data(elapsed_time, attrs, in_place=False)
@@ -726,7 +730,9 @@ class GraphManager():
 
             #target definition
             [DG.add_node(i[0], **{'target': risk_classes(i[1]['depth_above_invert'])}) for i in nodal_data.items()]
-
+            self.num_nodes[f'{self.event}_{elapsed_time}'] = len(DG.nodes())
+            self.num_edges[f'{self.event}_{elapsed_time}'] = len(DG.edges())
+            
             return DG
 
 
@@ -817,6 +823,8 @@ class GraphManager():
         self.digraphs = {}
         self.sub_digraphs = {}
         self.pos_dict = self.build_coordinates_dict()
+        self.num_nodes = defaultdict(int)
+        self.num_edges = defaultdict(int)
         self.torch_data = {}
 
 
