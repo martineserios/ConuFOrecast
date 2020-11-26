@@ -15,6 +15,7 @@ import torch
 from torch.utils.data import TensorDataset, DataLoader
 from torch_geometric.data import Dataset, Data
 
+
 class DBconnector():
     """
     Connection to the database
@@ -26,7 +27,7 @@ class DBconnector():
         self.pg_conn = psycopg2.connect(host=url, port=port, database=database, user=user, password=password)
 
 
-class GraphManager():
+class GraphEngine():
     """
     Initializes the graph of the whole model by doing the correponding queries to the database.
     The DB must be turned on.
@@ -1165,7 +1166,7 @@ class GraphManager():
 
         # torch_data = Data.from_dict(torch_data)
         # torch_data.num_nodes = graph.number_of_nodes()
-
+    
         if to_pickle:
             # open a file, where you ant to store the data
             file = open(f'{raw_data_folder}/{self.event}_{elapsed_time}_{node}_{graph_target}.gpickle', 'wb')

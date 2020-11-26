@@ -26,6 +26,8 @@ RUN apt-get update && apt-get install -y apt-utils lsb-release && apt-get clean 
   sudo apt-get update \ 
   sudo apt-get -y install postgresql \
   sudo apt -y install libpq-dev python3-dev \
-  pip install -r requirements.txt
+  pip install -r requirements.txt \
+  cd /usr/local/spark/jars \
+  wget https://jdbc.postgresql.org/download/postgresql-42.2.18.jar
 
 WORKDIR /mnt/
