@@ -686,38 +686,38 @@ class TseriesManager():
                 df = df.set_index('elapsed_time')
                 return df
     
+    # convert series to supervised learning
+    def series_to_supervised(self, data, n_in=1, n_out=1, dropnan=True):
+        n_vars = 1 if type(data) is list else data.shape[1]
+        df = pd.DataFrame(data)
+        cols, names = list(), list()
+        # input sequence (t-n, ... t-1)
+        for i in range(n_in, 0, -1):
+            cols.append(df.shift(i))
+            names += [('var%d(t-%d)' % (j+1, i)) for j in range(n_vars)]
+        # forecast sequence (t, t+1, ... t+n)
+        for i in range(0, n_out):
+            cols.append(df.shift(-i))
+            if i == 0:
+                names += [('var%d(t)' % (j+1)) for j in range(n_vars)]
+            else:
+                names += [('var%d(t+%d)' % (j+1, i)) for j in range(n_vars)]
+        # put it all together
+        agg = pd.concat(cols, axis=1)
+        agg.columns = names
+
+        return agg
 
     def tseries_for_superv_learning(self, item:str, vars_list:list, n_in=1, n_out=1, dropnan=True):
         #TO-DO change proceess to datatable framework
         tseries_df = self.timeseries(item, vars_list).to_pandas().set_index('elapsed_time')
+        tseries_df['rainfall_acc'] = tseries_df['rainfall_acc'].diff()
 
-        # convert series to supervised learning
-        def series_to_supervised(data, n_in=1, n_out=1, dropnan=True):
-            n_vars = 1 if type(data) is list else data.shape[1]
-            df = pd.DataFrame(data)
-            cols, names = list(), list()
-            # input sequence (t-n, ... t-1)
-            for i in range(n_in, 0, -1):
-                cols.append(df.shift(i))
-                names += [('var%d(t-%d)' % (j+1, i)) for j in range(n_vars)]
-            # forecast sequence (t, t+1, ... t+n)
-            for i in range(0, n_out):
-                cols.append(df.shift(-i))
-                if i == 0:
-                    names += [('var%d(t)' % (j+1)) for j in range(n_vars)]
-                else:
-                    names += [('var%d(t+%d)' % (j+1, i)) for j in range(n_vars)]
-            # put it all together
-            agg = pd.concat(cols, axis=1)
-            agg.columns = names
-            # drop rows with NaN values
-            if dropnan:
-                agg.dropna(inplace=True)
-            return agg
         
         # load dataset
         # dataset = read_csv('pollution.csv', header=0, index_col=0)
-        values = tseries_df.values
+        tseries_rain_df = tseries_df.iloc[:, -2:]
+        values = tseries_rain_df.values
         # integer encode direction
         # encoder = LabelEncoder()
         # values[:,4] = encoder.fit_transform(values[:,4])
@@ -727,12 +727,27 @@ class TseriesManager():
         # scaler = MinMaxScaler(feature_range=(0, 1))
         # scaled = scaler.fit_transform(values)
         # frame as supervised learning
-        reframed = series_to_supervised(values, n_in, n_out, dropnan)
-        # drop columns we don't want to predict
-        reframed.drop(reframed.columns[[6,7,8,9,10]], axis=1, inplace=True)
+        reframed = self.series_to_supervised(values, n_in, n_out, dropnan)
+        # drop columns we don't want to predicts
+        reframed = reframed.iloc[:, [0, -1]]#drop(reframed.columns[[6,7,8,9,10]], axis=1, inplace=True)
         # reframed.drop_duplicates(inplace=True)
 
-        return reframed#.iloc[1:, :]
+        cols = reframed.columns.tolist()
+        cols_y = [col for col in cols if ('var2(t)' in col)]
+        cols_X = [col for col in cols if ('var1(t-' in col)]
+        cols = cols_X + cols_y
+        reframed = reframed.loc[:, cols]
+
+        tseries_df = tseries_df.reset_index().iloc[:,1:]
+        reframed = pd.concat([tseries_df.iloc[:, 0:-2], reframed], axis=1, ignore_index=True)
+        # reframed = reframed.fillna(0).drop_duplicates()
+        # drop rows with NaN values
+        # if dropnan:
+        #     reframed.dropna(inplace=True)
+               
+        
+        return reframed
+        # return reframed, tseries_df.iloc[1:, :]
 
 
 
