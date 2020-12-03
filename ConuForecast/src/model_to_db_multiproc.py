@@ -680,12 +680,12 @@ def nodes_to_dfs(model, model_id):
     coordinates = [(j[0], j[1]) for i,j in df[['x_coord', 'y_coord']].iterrows()]
 
     pool = multiprocessing.Pool(8)
-    pool.map(convert_coords, coordinates)
+    coords.append(pool.map(convert_coords, coordinates))
     pool.close()
     pool.join()
 
-    for i in df[['x_coord', 'y_coord']].iterrows():
-        coords.append(convert_coords(i[1]))
+    # for i in df[['x_coord', 'y_coord']].iterrows():
+    #     coords.append(convert_coords(i[1]))
 
 
     # from pyproj import Transformer
@@ -710,7 +710,7 @@ def nodes_to_dfs(model, model_id):
 
 
 
-    df = pd.concat([df, pd.DataFrame(coords, columns=cols)], axis=1)
+    df = pd.concat([df, pd.DataFrame(coords[0], columns=cols)], axis=1)
 
     print('nodes','df created!')
     return df
@@ -1213,7 +1213,7 @@ if __name__ == "__main__":
 
     inp_to_db(model_inp, model_id, engine_base_ina)
 
-    # out_to_db(model_out, event_id, engine_base_ina) 
+    out_to_db(model_out, event_id, engine_base_ina) 
 
     print('Listo todo!')
     print('That took {} seconds'.format(time.time() - starttime))
