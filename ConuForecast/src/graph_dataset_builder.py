@@ -18,10 +18,7 @@ class ConuGraphDataset(Dataset):
         self, root:str, 
         time_step:int, 
         graph_manager:GraphManager, 
-        N:int, 
         attrs_dict:dict, 
-        nodes_to_sample:list=[], 
-        time_recurrence=False, 
         clean:bool=True, 
         transform=None, 
         pre_transform=None
@@ -29,17 +26,12 @@ class ConuGraphDataset(Dataset):
 
         self.root_dir = root
         self.time_step = time_step
+        self.graph_name_dict= defaultdict(str)
         self.target_dict = defaultdict(int)
         self.graph_manager = graph_manager
         self.clean = clean
         self.attrs_dict = attrs_dict
-        self.N = N
         self.graph_name_dict = defaultdict(str)
-        self.time_recurrence = time_recurrence
-        if len(nodes_to_sample) != 0:
-            self.sampled_nodes = nodes_to_sample
-        else:
-            self.sampled_nodes = []                        
         if self.clean:  
             [os.remove(f'{self.root_dir}/raw/{file}') for file in os.listdir(f'{self.root_dir}/raw/')]
             [os.remove(f'{self.root_dir}/processed/{file}') for file in os.listdir(f'{self.root_dir}/processed/')]
@@ -60,38 +52,15 @@ class ConuGraphDataset(Dataset):
     def download(self):
         graphs = self.graph_manager
         time_steps = (sorted(self.graph_manager.get_time_steps()[1])[::self.time_step])
-        #samples by ET
-        n = self.N / len(time_steps)
 
         if len(self.sampled_nodes) == 0:
-            if self.time_recurrence:
+            for time in tqdm(time_steps):
                 # stratified sampling
-                reference_graph = graphs.build_digraph(time_steps[2], self.attrs_dict, in_place=False)            
+                reference_graph = graphs.build_digraph(time, self.attrs_dict, in_place=False)
                 nodes_int_dict = {i:j['node_id'] for i,j in nx.convert_node_labels_to_integers(reference_graph).nodes(True)}
-                node_int_target = [j['target'] for i,j in nx.convert_node_labels_to_integers(reference_graph).nodes(True)]
-                node_int_arr = [i for i,j in nx.convert_node_labels_to_integers(reference_graph).nodes(True)]
-                sampled_nodes,_,_,_ = train_test_split(node_int_arr, node_int_target, train_size= n/len(node_int_arr))
-                self.sampled_nodes = [nodes_int_dict[i] for i in sampled_nodes] 
+                node_int_arr = np.array([i for i,j in nx.convert_node_labels_to_integers(reference_graph).nodes(True)])
 
-                for time in tqdm(time_steps):
-                    # graphs.build_digraph(time, self.attrs_dict, in_place=False)
-                    for node in [nodes_int_dict[i] for i in sampled_nodes]:
-                        graphs.subgraphs_to_torch_tensors(time, node, self.attrs_dict, self.raw_dir, to_pickle=True)
-            else:
-                
-                #samples by ET
-                n = self.N / len(time_steps)
-
-                for time in tqdm(time_steps):
-                    # stratified sampling
-                    reference_graph = graphs.build_digraph(time, self.attrs_dict, in_place=False)
-                    nodes_int_dict = {i:j['node_id'] for i,j in nx.convert_node_labels_to_integers(reference_graph).nodes(True)}
-                    node_int_target = np.array([j['target'] for i,j in nx.convert_node_labels_to_integers(reference_graph).nodes(True)])
-                    node_int_arr = np.array([i for i,j in nx.convert_node_labels_to_integers(reference_graph).nodes(True)])
-                    sampled_nodes,_,_,_ = train_test_split(node_int_arr, node_int_target, train_size= n/len(node_int_arr))
-                    
-                    for node in [nodes_int_dict[i] for i in sampled_nodes]:
-                        graphs.subgraphs_to_torch_tensors(time, node, self.attrs_dict, self.raw_dir, to_pickle=True)
+                graphs.subgraph_to_torch_tensor(time, self.attrs_dict, self.raw_dir, to_pickle=True)
 
         else:
             if self.time_recurrence:
