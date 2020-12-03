@@ -13,9 +13,10 @@ from torch_geometric.data import Dataset, Data
 
 class ConuGraphDataset(Dataset):
     
-    def __init__(self, root:str, time_step:int, graph_manager:GraphManager, N, attrs_dict:dict, clean:bool=True, transform=None, pre_transform=None):
+    def __init__(self, root:str, time_step:int, graph_manager:GraphManager, N:int, attrs_dict:dict, clean:bool=True, transform=None, pre_transform=None):
         # self.elapsed_time = elapsed_time
         self.time_step = time_step
+        self.graph_name_dict= defaultdict(str)
         self.target_dict = defaultdict(int)
         self.graph_manager = graph_manager
         self.clean = clean
@@ -51,13 +52,14 @@ class ConuGraphDataset(Dataset):
             
             # stratified sampling
             nodes_int_dict = {i:j['node_id'] for i,j in nx.convert_node_labels_to_integers(a_graph).nodes(True)}
-            node_int_target = np.array([j['target'] for i,j in nx.convert_node_labels_to_integers(a_graph).nodes(True)])
+            # node_int_target = np.array([j['target'] for i,j in nx.convert_node_labels_to_integers(a_graph).nodes(True)])
             node_int_arr = np.array([i for i,j in nx.convert_node_labels_to_integers(a_graph).nodes(True)])
 
-            sampled_nodes = train_test_split(node_int_arr, node_int_target, test_size= n/len(node_int_arr))
+            # sampled_nodes = train_test_split(node_int_arr, node_int_target, test_size= n/len(node_int_arr))
+            # sampled_nodes = train_test_split(node_int_arr, test_size= n/len(node_int_arr))
 
-            for node in [nodes_int_dict[i] for i in sampled_nodes[1]]:
-                graphs.subgraphs_to_torch_tensors(time, node, self.attrs_dict, self.raw_dir, to_pickle=True)
+            # for node in [nodes_int_dict[i] for i in sampled_nodes[1]]:
+            graphs.graph_to_torch_tensor(time, self.attrs_dict, self.raw_dir, to_pickle=True)
 
 
     def process(self):
@@ -94,7 +96,7 @@ class ConuGraphDataset(Dataset):
         return data
 
 
-    @property
-    def num_classes(self):
-        r"""The number of classes in the dataset."""
-        return len(set(j.item() for i,j in self.target_dict.items()))
+    # @property
+    # def num_classes(self):
+    #     r"""The number of classes in the dataset."""
+    #     return len(set(j.item() for i,j in self.target_dict.items()))
