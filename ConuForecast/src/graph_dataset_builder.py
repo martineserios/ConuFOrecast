@@ -7,7 +7,7 @@ import networkx as nx
 import numpy as np
 import pickle
 from collections import defaultdict
-from ConuForecast.src.graph_utils import GraphManager
+from ConuForecast.src.graph_utils import GraphEngine
 from sklearn.model_selection import train_test_split
 import torch
 from torch_geometric.data import Dataset, Data
@@ -17,7 +17,7 @@ class ConuGraphDataset(Dataset):
     def __init__(
         self, root:str, 
         time_step:int, 
-        graph_manager:GraphManager, 
+        graph_manager:GraphEngine, 
         attrs_dict:dict, 
         clean:bool=True, 
         transform=None, 
@@ -53,36 +53,10 @@ class ConuGraphDataset(Dataset):
         graphs = self.graph_manager
         time_steps = (sorted(self.graph_manager.get_time_steps()[1])[::self.time_step])
 
-        if len(self.sampled_nodes) == 0:
-            for time in tqdm(time_steps):
-                # stratified sampling
-                reference_graph = graphs.build_digraph(time, self.attrs_dict, in_place=False)
-                nodes_int_dict = {i:j['node_id'] for i,j in nx.convert_node_labels_to_integers(reference_graph).nodes(True)}
-                node_int_arr = np.array([i for i,j in nx.convert_node_labels_to_integers(reference_graph).nodes(True)])
 
-                graphs.subgraph_to_torch_tensor(time, self.attrs_dict, self.raw_dir, to_pickle=True)
+        for time in tqdm(time_steps):
+            graphs.graph_to_torch_tensor(time, self.attrs_dict, self.raw_dir, to_pickle=True)
 
-        else:
-            if self.time_recurrence:
-                reference_graph = graphs.build_digraph(time_steps[2], self.attrs_dict, in_place=False)
-                nodes_int_dict = {i:j['node_id'] for i,j in nx.convert_node_labels_to_integers(reference_graph).nodes(True)}
-
-                for time in tqdm(time_steps):
-                    # graphs.build_digraph(time, self.attrs_dict, in_place=False)
-                    for node in [nodo for nodo in self.sampled_nodes]:
-                        graphs.subgraphs_to_torch_tensors(time, node, self.attrs_dict, self.raw_dir, to_pickle=True)
-            else:
-                
-                #samples by ET
-                n = self.N / len(time_steps)
-
-                for time in tqdm(time_steps):
-                    # stratified sampling
-                    reference_graph = graphs.build_digraph(time, self.attrs_dict, in_place=False)
-                    nodes_int_dict = {i:j['node_id'] for i,j in nx.convert_node_labels_to_integers(reference_graph).nodes(True)}
-                    
-                    for node in [nodo for nodo in self.sampled_nodes]:
-                        graphs.subgraphs_to_torch_tensors(time, node, self.attrs_dict, self.raw_dir, to_pickle=True)
 
 
     def process(self):
@@ -127,18 +101,17 @@ class ConuGraphDataset(Dataset):
         return len(set(j.item() for i,j in self.target_dict.items()))
 
 
-    def train_test_split(self, test_size:float):
-        node_int_target = [self.get(i).y.item() for i in range(self.len())]
-        node_int_arr = [i for i in range(self.len())]
+    # def train_test_split(self, test_size:float):
+    
+    #     N = self.graph_manager.get_time_steps()[0].shape[0] // self.time_step
+    #     train_ids, test_ids, _, _ = train_test_split(
+    #         node_int_arr, 
+    #         node_int_target, 
+    #         test_size = test_size, 
+    #         stratify = node_int_target
+    #         )
 
-        train_ids, test_ids, _, _ = train_test_split(
-            node_int_arr, 
-            node_int_target, 
-            test_size = test_size, 
-            stratify = node_int_target
-            )
+    #     train_set = self[train_ids]
+    #     test_set = self[test_ids]
 
-        train_set = self[train_ids]
-        test_set = self[test_ids]
-
-        return train_set, test_set        
+    #     return train_set, test_set        

@@ -1142,7 +1142,9 @@ class GraphEngine():
                 for key, value in feat_dict.items():
                     torch_data['edge_' + str(key)] = [value] if i == 0 else torch_data['edge_' + str(key)] + [value]
         
-        torch_data['x'] = [list(v[1].values())[4:-1] for i,v in enumerate(graph_.nodes(data=True))]
+        torch_data['x'] = [list(v[1].values())[4:-2] for i,v in enumerate(graph_.nodes(data=True))]
+
+        torch_data['y'] = [list(v[1].values())[-1] for i,v in enumerate(graph_.nodes(data=True))]
 
         torch_data['edge_attrs'] = [list(v[2].values())[5:] for i,v in enumerate(graph_.edges(data=True))]
 
@@ -1150,7 +1152,7 @@ class GraphEngine():
 
         for key, data in torch_data.items():
             try:
-                if (key == 'x'):# | (key == 'edge_attrs'):
+                if (key == 'x') | (key == 'y'):# | (key == 'edge_attrs'):
                     # torch_data[key] = torch.tensor(item)
                     torch_data[key] = torch.tensor(data)
                 elif (key == 'edge_index') | (key == 'edge_attrs'):
