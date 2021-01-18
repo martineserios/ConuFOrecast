@@ -1,17 +1,15 @@
 # -*- coding: utf-8 -*-
 import os
 import os.path as osp
-from posix import listdir
-from tqdm.std import tqdm
-import networkx as nx
-import numpy as np
 import pickle
-from collections import defaultdict
-from ConuForecast.src.graph_utils import GraphEngine
-from sklearn.model_selection import train_test_split
 import torch
+from tqdm.std import tqdm
+from collections import defaultdict
+from sklearn.model_selection import train_test_split
 from torch_geometric.data import Dataset, Data
 
+# local packages
+from ConuForecast.src.graph_utils import GraphEngine
 
 class ConuGraphDataset(Dataset):
     def __init__(
@@ -48,7 +46,7 @@ class ConuGraphDataset(Dataset):
     def processed_file_names(self):
         return os.listdir(osp.join(self.root, 'processed'))
         
-
+    
     def download(self):
         graphs = self.graph_manager
         time_steps = (sorted(self.graph_manager.get_time_steps()[1])[::self.time_step])
@@ -57,8 +55,7 @@ class ConuGraphDataset(Dataset):
         for time in tqdm(time_steps):
             graphs.graph_to_torch_tensor(time, self.attrs_dict, self.raw_dir, to_pickle=True)
 
-
-
+    
     def process(self):
         i = 0
         for raw_path in self.raw_paths:
@@ -71,11 +68,12 @@ class ConuGraphDataset(Dataset):
             if len(filename) > 1:
                 self.graph_name_dict[i] = f'{i}_{filename}'
 
+
                 # if self.pre_filter is not None and not self.pre_filter(torch_data):
                 #     continue
 
-                # if self.pre_transform is not None:
-                #     torch_data = self.pre_transform(torch_data)
+                # if self.transform:
+                #     torch_data = self.normalizer(torch_data)
 
                 torch.save(torch_data, osp.join(self.processed_dir, f'{i}_{filename}.pt'))
 

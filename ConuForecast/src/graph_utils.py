@@ -30,7 +30,6 @@ class DBconnector():
 class GraphEngine():
     """
     Initializes the graph of the whole model by doing the correponding queries to the database.
-    The DB must be turned on.
     """
     def get_time_steps(self):
         time_range_query = f"""
@@ -570,66 +569,66 @@ class GraphEngine():
                 nid.imperv,
                 nid.slope,
                 nid.width,
-                nid.curb_len,
-                nid.raingage_id 
+                nid.curb_len
+--                nid.raingage_id 
             FROM
                 nodal_out_data AS nod 
                 LEFT JOIN
                     nodal_inp_data AS nid 
                     ON nod.node_id = nid.node_id 
         )
-        ,
-        rain_mdata AS 
-        (
-            SELECT
-                * 
-            FROM
-                raingages_metadata rm 
-            WHERE
-                rm.precipitation_id = '{self.precip}' 
-        )
-        ,
-        rain_tseries AS 
-        (
-            SELECT
-                * 
-            FROM
-                raingages_timeseries rt 
-            WHERE
-                rt.precipitation_id = '{self.precip}' 
-        )
-        ,
-        rain AS
-        (
-            SELECT
-                rt.raingage_id,
-                rt.elapsed_time,
-                COALESCE (rt.VALUE, 0) AS rainfall_acc,
-                rm.format,
-                rm.unit 
-            FROM
-                raingages_timeseries rt 
-                JOIN
-                    raingages_metadata AS rm 
-                    ON rt.precipitation_id = rm.precipitation_id 
-        )
-        ,
-        final AS
-        (
-        SELECT DISTINCT
-            nd.*,
-            COALESCE (r.rainfall_acc, 0) AS rainfall_acc,
-            COALESCE (r.format, '') AS format,
-            COALESCE (r.unit, '') AS unit 
-        FROM
-            nodal_data nd 
-            LEFT JOIN
-                rain r 
-                ON nd.raingage_id = r.raingage_id 
-                AND nd.elapsed_time = r.elapsed_time
-        )
+--        ,
+--        rain_mdata AS 
+--        (
+--            SELECT
+--                * 
+--            FROM
+--                raingages_metadata rm 
+--            WHERE
+--                rm.precipitation_id = '{self.precip}' 
+--        )
+--        ,
+--        rain_tseries AS 
+--        (
+--            SELECT
+--                * 
+--            FROM
+--                raingages_timeseries rt 
+--            WHERE
+--                rt.precipitation_id = '{self.precip}' 
+--        )
+--        ,
+--        rain AS
+--        (
+--            SELECT
+--                rt.raingage_id,
+--                rt.elapsed_time,
+--                COALESCE (rt.VALUE, 0) AS rainfall_acc,
+--                rm.format,
+--                rm.unit 
+--            FROM
+--                raingages_timeseries rt 
+--                JOIN
+--                    raingages_metadata AS rm 
+--                    ON rt.precipitation_id = rm.precipitation_id 
+--        )
+--        ,
+--        final AS
+--        (
+--        SELECT DISTINCT
+--            nd.*,
+--            COALESCE (r.rainfall_acc, 0) AS rainfall_acc,
+--            COALESCE (r.format, '') AS format,
+--            COALESCE (r.unit, '') AS unit 
+--       FROM
+--            nodal_data nd 
+--            LEFT JOIN
+--               rain r 
+--                ON nd.raingage_id = r.raingage_id 
+--               AND nd.elapsed_time = r.elapsed_time
+--        )
         SELECT {node_attrs}
-        FROM final
+        FROM nodal_data
         """
 
         cur2 = self.conn.cursor()
@@ -1142,19 +1141,26 @@ class GraphEngine():
                 for key, value in feat_dict.items():
                     torch_data['edge_' + str(key)] = [value] if i == 0 else torch_data['edge_' + str(key)] + [value]
         
-        torch_data['x'] = [list(v[1].values())[4:-2] for i,v in enumerate(graph_.nodes(data=True))]
+        torch_data['x'] = [list(v[1].values())[4:-1] for v in graph_.nodes(data=True)]
+        torch_data['x'] = [[v[1][i] for i in attrs_dict['nodes'][:-1]] for v in graph_.nodes(data=True)]
 
-        torch_data['y'] = [list(v[1].values())[-1] for i,v in enumerate(graph_.nodes(data=True))]
+        torch_data['y'] = [list(v[1].values())[-1] for v in graph_.nodes(data=True)]
+        torch_data['y'] = [v[1][attrs_dict['nodes'][-1]] for v in graph_.nodes(data=True)]
 
-        torch_data['edge_attrs'] = [list(v[2].values())[5:] for i,v in enumerate(graph_.edges(data=True))]
+
+        # torch_data['edge_attrs'] = [list(v[2].values())[5:] for v in graph_.edges(data=True)]
+        # torch_data['edge_attrs'] = [[v[1][i] for i in attrs_dict['edges'][-1]] for v in graph_.edges(data=True)]
 
         torch_data['edge_index'] = edge_index.view(2, -1)
 
         for key, data in torch_data.items():
             try:
-                if (key == 'x') | (key == 'y'):# | (key == 'edge_attrs'):
+                if (key == 'x'):# | (key == 'edge_attrs'):
                     # torch_data[key] = torch.tensor(item)
                     torch_data[key] = torch.tensor(data)
+                elif (key == 'y'):# | (key == 'edge_attrs'):
+                    # torch_data[key] = torch.tensor(item)
+                    torch_data[key] = torch.tensor(data, dtype=torch.long)
                 elif (key == 'edge_index') | (key == 'edge_attrs'):
                     torch_data[key] = torch.tensor(data, dtype=torch.long)
                 # elif (key == 'y'):
@@ -1182,7 +1188,8 @@ class GraphEngine():
 
 
 
-    def subgraphs_to_torch_tensors(self, elapsed_time:str, node:str, attrs_dict:dict, raw_data_folder:str, detailed:bool=False, to_pickle:bool=True,):
+    def subgraphs_to_torch_tensors(self, elapsed_time:str, node:str, attrs_dict:dict, \
+        raw_data_folder:str, detailed:bool=False, to_pickle:bool=True,):
         """Converts a :obj:`networkx.Graph` or :obj:`networkx.DiGraph` to a
         :class:`torch_geometric.data.Data` instance.
 
@@ -1666,10 +1673,19 @@ class GraphEngine():
                 return df
 
             else:
+                # if 'depth_above_invert' in var:
                 df = dt_nodes[:, ['node_id','elapsed_time'] + var].to_pandas()
                 df.loc[:,'elapsed_time'] = pd.to_datetime(df.loc[:,'elapsed_time'])
+                df['time_to_peak'] = df.iloc[(df['depth_above_invert'].idxmax())]['elapsed_time']
+                df['peak'] = df['depth_above_invert'].max()
                 df = df.set_index('elapsed_time')
                 return df
+                # else:
+                #     df = dt_nodes[:, ['node_id','elapsed_time'] + var].to_pandas()
+                #     df.loc[:,'elapsed_time'] = pd.to_datetime(df.loc[:,'elapsed_time'])
+                #     df = df.set_index('elapsed_time')
+                #     return df
+
 
         else:
             nodal_linkage_query_link = f"""

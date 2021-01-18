@@ -63,6 +63,20 @@ class TseriesManager():
         return time_step, f'{time_step} minutes'
 
 
+    def get_events(self):
+        events_query = f"""
+        SELECT DISTINCT
+            event_id 
+        FROM
+            events e 
+        """
+
+        cur0 = self.conn.cursor()
+        cur0.execute(events_query)
+        events_query_result = cur0.fetchall()
+
+        return events_query_result
+
 
     def get_nodes(self):
         nodes_query = f"""
@@ -153,7 +167,7 @@ class TseriesManager():
         return np.array(dt_nodes)
 
 
-    def timeseries(self, item: str, vars_list:list):
+    def timeseries(self, item: str, vars_list:list, peak_data:bool=False):
         """
         Generates the timeseries of any variable of any element.
         """
@@ -427,8 +441,16 @@ class TseriesManager():
             NodeVars = namedtuple('NodeVars', nodal_data_cols)
 
             dt_nodes = dt.Frame([i for i in map(NodeVars._make, [i for i in nodal_data_result])], names=nodal_data_cols)
-
-            return dt_nodes
+            
+            if peak_data:
+                df = dt_nodes.loc[:, ['node_id','elapsed_time'] + vars].to_pandas()
+                dt_nodes[:, 'elapsed_time'] = pd.to_datetime(dt_nodes.loc[:,'elapsed_time'])
+                dt_nodes['time_to_peak'] = dt_nodes.iloc[(dt_nodes['depth_above_invert'].idxmax())]['elapsed_time']
+                dt_nodes['peak'] = dt_nodes['depth_above_invert'].max()
+                df = dt_nodes.set_index('elapsed_time')
+                return dt_nodes
+            else:
+                return dt_nodes
 
 
 
@@ -710,8 +732,8 @@ class TseriesManager():
 
     def tseries_for_superv_learning(self, item:str, vars_list:list, n_in=1, n_out=1, dropnan=True):
         #TO-DO change proceess to datatable framework
-        tseries_df = self.timeseries(item, vars_list).to_pandas().set_index('elapsed_time')
-        tseries_df['rainfall_acc'] = tseries_df['rainfall_acc'].diff()
+        tseries_df = self.timeseries(item, vars_list, peak_data=False).to_pandas().set_index('elapsed_time')
+        # tseries_df['rainfall_acc'] = tseries_df['rainfall_acc'].diff()
 
         
         # load dataset
@@ -740,7 +762,7 @@ class TseriesManager():
 
         tseries_df = tseries_df.reset_index().iloc[:,1:]
         reframed = pd.concat([tseries_df.iloc[:, 0:-2], reframed], axis=1, ignore_index=True)
-        # reframed = reframed.fillna(0).drop_duplicates()
+        reframed = reframed.fillna(0)
         # drop rows with NaN values
         # if dropnan:
         #     reframed.dropna(inplace=True)
