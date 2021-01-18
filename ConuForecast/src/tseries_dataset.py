@@ -14,6 +14,10 @@ from datetime import datetime
 from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import MinMaxScaler
 
+
+# import local packages
+from ConuForecast.src.graph_utils import GraphEngine
+
 # import torch
 # from torch.utils.data import TensorDataset, DataLoader
 # from torch_geometric.data import Dataset, Data
@@ -28,89 +32,9 @@ class DBconnector():
 
 
 
-class TseriesManager():
-    """
-    Initializes the graph of the whole model by doing the correponding queries to the database.
-    The DB must be turned on.
-    """
-    def get_time_steps(self):
-        time_range_query = f"""
-        SELECT DISTINCT
-            elapsed_time 
-        FROM
-            events_nodes en 
-        WHERE
-            event_id = '{self.event}'
-        """
-
-        cur0 = self.conn.cursor()
-        cur0.execute(time_range_query)
-        time_range_query_result = cur0.fetchall()
-
-        time_range_query_result = sorted([time for time in time_range_query_result])
-
-        time_range_query_result_formatted = sorted([time[0].strftime("%Y-%m-%d %H:%M:%S") for time in time_range_query_result])
-
-        return time_range_query_result, time_range_query_result_formatted 
-
-
-    def which_time_step(self):
-        
-        time_range = self.get_time_steps()[0]
-        first_two = time_range[:2]
-        time_step = (first_two[1][0] - first_two[0][0]).seconds // 60
-
-        return time_step, f'{time_step} minutes'
-
-
-    def get_events(self):
-        events_query = f"""
-        SELECT DISTINCT
-            event_id 
-        FROM
-            events e 
-        """
-
-        cur0 = self.conn.cursor()
-        cur0.execute(events_query)
-        events_query_result = cur0.fetchall()
-
-        return events_query_result
-
-
-    def get_nodes(self):
-        nodes_query = f"""
-        SELECT
-            node_id
-        FROM
-            nodes_coordinates nc 
-        WHERE
-            nc.model_id = '{self.model}'
-        """
-
-        cur1 = self.conn.cursor()
-        cur1.execute(nodes_query)
-        nodes_query_result = cur1.fetchall()
-
-        nodes = sorted([node for nodes in nodes_query_result for node in nodes])
-
-        return nodes 
-    
-
-
+class TseriesManager(GraphEngine):
     def __init__(self, model:str, event:str, precip:str, conn) -> None:
-        self.conn = conn.pg_conn
-        # self.elapsed_time = elapsed_time
-        self.model = model
-        self.event = event
-        self.precip = precip
-        self.time_range = self.get_time_steps()
-        self.nodal_linkage_query_results = {}
-        self.nodal_linkage_dict = {}
-        self.nodal_data_query_results = {}
-        self.nodal_data_dict = {}
-        self.num_nodes = defaultdict(int)
-        self.num_edges = defaultdict(int)
+        super(TseriesManager, self).__init__(model, event, precip, conn)
 
 
     def precipitation_tseries(self):
@@ -738,7 +662,7 @@ class TseriesManager():
         
         # load dataset
         # dataset = read_csv('pollution.csv', header=0, index_col=0)
-        tseries_rain_df = tseries_df.iloc[:, -2:]
+        tseries_rain_df = tseries_df.iloc[:, -1:]
         values = tseries_rain_df.values
         # integer encode direction
         # encoder = LabelEncoder()
@@ -751,17 +675,17 @@ class TseriesManager():
         # frame as supervised learning
         reframed = self.series_to_supervised(values, n_in, n_out, dropnan)
         # drop columns we don't want to predicts
-        reframed = reframed.iloc[:, [0, -1]]#drop(reframed.columns[[6,7,8,9,10]], axis=1, inplace=True)
+        # reframed = reframed.iloc[:, [0, -1]]#drop(reframed.columns[[6,7,8,9,10]], axis=1, inplace=True)
         # reframed.drop_duplicates(inplace=True)
 
         cols = reframed.columns.tolist()
-        cols_y = [col for col in cols if ('var2(t)' in col)]
-        cols_X = [col for col in cols if ('var1(t-' in col)]
-        cols = cols_X + cols_y
+        # cols_y = [col for col in cols if ('var2(t)' in col)]
+        # cols_X = [col for col in cols if ('var1(t-' in col)]
+        # cols = cols_X + cols_y
         reframed = reframed.loc[:, cols]
 
         tseries_df = tseries_df.reset_index().iloc[:,1:]
-        reframed = pd.concat([tseries_df.iloc[:, 0:-2], reframed], axis=1, ignore_index=True)
+        reframed = pd.concat([tseries_df.iloc[:, 0:-1], reframed], axis=1, ignore_index=True)
         reframed = reframed.fillna(0)
         # drop rows with NaN values
         # if dropnan:

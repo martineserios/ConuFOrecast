@@ -60,6 +60,40 @@ class GraphEngine():
 
         return time_step, f'{time_step} minutes'
     
+    
+    def get_events(self):
+        events_query = f"""
+        SELECT DISTINCT
+            event_id 
+        FROM
+            events e 
+        """
+
+        cur0 = self.conn.cursor()
+        cur0.execute(events_query)
+        events_query_result = cur0.fetchall()
+
+        return events_query_result
+
+
+    def get_nodes(self):
+        nodes_query = f"""
+        SELECT
+            node_id
+        FROM
+            nodes_coordinates nc 
+        WHERE
+            nc.model_id = '{self.model}'
+        """
+
+        cur1 = self.conn.cursor()
+        cur1.execute(nodes_query)
+        nodes_query_result = cur1.fetchall()
+
+        nodes = sorted([node for nodes in nodes_query_result for node in nodes])
+
+        return nodes 
+
 
     def nodal_linkage_query(self, elapsed_time:str, attrs:dict, in_place:bool=True):
         

@@ -1,4 +1,3 @@
-# %%
 # -*- coding: utf-8 -*-
 # Loading libraries
 import os
@@ -18,7 +17,6 @@ from sqlalchemy.orm import sessionmaker
 import multiprocessing
 
 import pyproj
-#%%
 
 model_id =  'model_' + input('4-digit model_id like: 0123:    ' )
 precipitation_id ='precipitation_' + input('4-digit raingage_id like 0123:    ')
