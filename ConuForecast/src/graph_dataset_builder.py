@@ -33,7 +33,8 @@ class ConuGraphDataset(Dataset):
         if self.clean:  
             [os.remove(f'{self.root_dir}/raw/{file}') for file in os.listdir(f'{self.root_dir}/raw/')]
             [os.remove(f'{self.root_dir}/processed/{file}') for file in os.listdir(f'{self.root_dir}/processed/')]
-        super(ConuGraphDataset, self).__init__(root, transform, pre_transform)
+        # super(ConuGraphDataset, self).__init__(root, transform, pre_transform)
+        super(ConuGraphDataset, self).__init__(root, transform, pre_transform)        
         self.process()
         self.data = None
  

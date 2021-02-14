@@ -7,7 +7,7 @@ import psycopg2
 import datatable as dt
 import pickle
 import plotly.express as px
-from plotly.subplots import make_subplots
+# from plotly.subplots import make_subplots
 from collections import namedtuple, defaultdict
 from datetime import datetime
 
@@ -21,10 +21,16 @@ class DBconnector():
     Connection to the database
     """
     #host="172.18.0.1", port = 5555, database="base-ina", user="postgres", password="postgres"
-
-
     def __init__(self, url: str, port: int, database: str, user: str, password: str) -> None:
         self.pg_conn = psycopg2.connect(host=url, port=port, database=database, user=user, password=password)
+    
+    def query(self, query:str):
+        
+        cur0 = self.pg_conn.cursor()
+        cur0.execute(query)
+        query_result = cur0.fetchall()
+        
+        return query_result
 
 
 class GraphEngine():
@@ -61,21 +67,6 @@ class GraphEngine():
         return time_step, f'{time_step} minutes'
     
     
-    def get_events(self):
-        events_query = f"""
-        SELECT DISTINCT
-            event_id 
-        FROM
-            events e 
-        """
-
-        cur0 = self.conn.cursor()
-        cur0.execute(events_query)
-        events_query_result = cur0.fetchall()
-
-        return events_query_result
-
-
     def get_nodes(self):
         nodes_query = f"""
         SELECT
@@ -95,7 +86,7 @@ class GraphEngine():
         return nodes 
 
 
-    def nodal_linkage_query(self, elapsed_time:str, attrs:dict, in_place:bool=True):
+    def nodal_linkage_query(self, elapsed_time:str, attrs:dict, persist:bool=True):
         
         link_attrs = ', '.join(['edge', 'link_id', 'from_node', 'to_node', 'elapsed_time']) + ', ' + ', '.join(attrs['edges'])
 
@@ -375,19 +366,19 @@ class GraphEngine():
         cur1.execute(nodal_linkage_query)
         nodal_linkage_query_result = cur1.fetchall()
         
-        if in_place:
+        if persist:
             self.nodal_linkage_query_results[f'{self.event}_{elapsed_time}'] = nodal_linkage_query_result
         else:
             return nodal_linkage_query_result
 
 
 
-    def get_nodal_linkage(self, elapsed_time:str, attrs:dict, in_place:bool=True):
+    def get_nodal_linkage(self, elapsed_time:str, attrs:dict, persist:bool=True):
 
         link_attrs = ','.join(['edge', 'link_id', 'from_node', 'to_node', 'elapsed_time']) + ',' + ','.join(attrs['edges'])
 
 
-        if in_place:
+        if persist:
             try:
                 self.nodal_linkage_dict[f'{self.event}_{elapsed_time}']
             
@@ -401,7 +392,7 @@ class GraphEngine():
 
                 self.nodal_linkage_dict[f'{self.event}_{elapsed_time}'] = nodal_linkage
         else:
-            query = self.nodal_linkage_query(elapsed_time, attrs, in_place=False)
+            query = self.nodal_linkage_query(elapsed_time, attrs, persist=False)
                     
             nodal_linkage = {i[0]:
             dict(zip(link_attrs.split(','), i))
@@ -411,7 +402,7 @@ class GraphEngine():
             return nodal_linkage
 
 
-    def nodal_data_query(self, elapsed_time:str, attrs:dict, in_place:bool=True):
+    def nodal_data_query(self, elapsed_time:str, attrs:dict, persist:bool=True):
 
         node_attrs = ','.join(['node_id', 'subcatchment_id', 'elapsed_time', 'depth_above_invert']) + ',' + ','.join(attrs['nodes'])
 
@@ -669,18 +660,18 @@ class GraphEngine():
         cur2.execute(nodal_data_query)
         nodal_data_query_result = cur2.fetchall()
 
-        if in_place:
+        if persist:
             self.nodal_data_query_results[f'{self.event}_{elapsed_time}'] = nodal_data_query_result
         else:
             return nodal_data_query_result
 
 
 
-    def get_nodal_data(self, elapsed_time:str, attrs:dict, in_place:bool=True):
+    def get_nodal_data(self, elapsed_time:str, attrs:dict, persist:bool=True):
 
         node_attrs = ','.join(['node_id', 'subcatchment_id', 'elapsed_time', 'depth_above_invert']) + ',' + ','.join(attrs['nodes'])
 
-        if in_place:
+        if persist:
             try:
                 self.nodal_data_dict[f'{self.event}_{elapsed_time}']
 
@@ -694,7 +685,7 @@ class GraphEngine():
 
                 self.nodal_data_dict[f'{self.event}_{elapsed_time}'] = nodal_data
         else:
-            query = self.nodal_data_query(elapsed_time, attrs, in_place=False)
+            query = self.nodal_data_query(elapsed_time, attrs, persist=False)
             
             nodal_data = {i[0]: dict(zip(node_attrs.split(','), i))
             for i in query
@@ -706,10 +697,10 @@ class GraphEngine():
 
     # graph creation
 
-    def build_digraph(self, elapsed_time:str, attrs:dict, in_place:bool=True):
-        if in_place:
-            self.get_nodal_data(elapsed_time, attrs, in_place=True)
-            self.get_nodal_linkage(elapsed_time, attrs, in_place=True)
+    def build_digraph(self, elapsed_time:str, attrs:dict, persist:bool=True):
+        if persist:
+            self.get_nodal_data(elapsed_time, attrs, persist=True)
+            self.get_nodal_linkage(elapsed_time, attrs, persist=True)
 
             #target definition
             def risk_classes(level):
@@ -734,7 +725,7 @@ class GraphEngine():
                 #target definition
                 [DG.add_node(i[0], **{'target': risk_classes(i[1]['depth_above_invert'])}) for i in self.nodal_data_dict[f'{self.event}_{elapsed_time}'].items()]
 
-                if in_place:
+                if persist:
                     self.digraphs[f'{self.event}_{elapsed_time}'] = DG
                     self.num_nodes[f'{self.event}_{elapsed_time}'] = len(DG.nodes())
                     self.num_edges[f'{self.event}_{elapsed_time}'] = len(DG.edges())
@@ -742,8 +733,8 @@ class GraphEngine():
 
         
         else:
-            nodal_data = self.get_nodal_data(elapsed_time, attrs, in_place=False)
-            nodal_linkage = self.get_nodal_linkage(elapsed_time, attrs, in_place=False)
+            nodal_data = self.get_nodal_data(elapsed_time, attrs, persist=False)
+            nodal_linkage = self.get_nodal_linkage(elapsed_time, attrs, persist=False)
 
             #target definition
             def risk_classes(level):
@@ -863,14 +854,14 @@ class GraphEngine():
 
 
 
-    def build_subgraph(self, node:str, elapsed_time:str, attrs:dict, acc_data:bool, in_place:bool=True):
+    def build_subgraph(self, node:str, elapsed_time:str, attrs:dict, acc_data:bool, persist:bool=True):
         
         try:
             self.digraphs[f'{self.event}_{elapsed_time}']
         except:
             self.build_digraph(elapsed_time, attrs)
 
-        if in_place:
+        if persist:
             try:
                 self.sub_digraphs[f'{self.event}_{node}_{elapsed_time}']
             
@@ -1005,10 +996,10 @@ class GraphEngine():
             try:
                 graph = self.digraphs[f'{self.event}_{elapsed_time}']
             except:
-                graph = self.build_digraph(elapsed_time, attrs, in_place=True)
+                graph = self.build_digraph(elapsed_time, attrs, persist=True)
             
-            nodal_data_dict = self.get_nodal_data(elapsed_time, attrs, in_place=False)
-            nodal_linkage_dict = self.get_nodal_linkage(elapsed_time, attrs, in_place=False)
+            nodal_data_dict = self.get_nodal_data(elapsed_time, attrs, persist=False)
+            nodal_linkage_dict = self.get_nodal_linkage(elapsed_time, attrs, persist=False)
 
             preds_list = [(i[0],i[1]) for i in nx.edge_dfs(graph, node, 'reverse')]
             if len(preds_list) == 0:
@@ -1156,7 +1147,7 @@ class GraphEngine():
         # test_DataLoaders = {}
 
 
-        DG = self.build_digraph(elapsed_time=elapsed_time, attrs=attrs_dict, in_place=False)
+        DG = self.build_digraph(elapsed_time=elapsed_time, attrs=attrs_dict, persist=False)
 
         graph_ = DG.copy()
         graph_ = nx.convert_node_labels_to_integers(graph_)
@@ -1240,7 +1231,7 @@ class GraphEngine():
         test_DataLoaders = {}
 
 
-        DG = self.build_subgraph(node=node, elapsed_time=elapsed_time, attrs=attrs_dict, acc_data=False, in_place=False)
+        DG = self.build_subgraph(node=node, elapsed_time=elapsed_time, attrs=attrs_dict, acc_data=False, persist=False)
 
         graph_ = DG.copy()
         graph_ = nx.convert_node_labels_to_integers(graph_)
@@ -2017,4 +2008,3 @@ class GraphEngine():
         subfig.update_layout(showlegend=False)
 
         return subfig
-# %%

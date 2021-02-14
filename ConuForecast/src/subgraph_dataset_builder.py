@@ -7,7 +7,7 @@ import networkx as nx
 import numpy as np
 import pickle
 from collections import defaultdict
-from ConuForecast.src.graph_utils import GraphManager
+from ConuForecast.src.graph_utils import GraphEngine
 from sklearn.model_selection import train_test_split
 import torch
 from torch_geometric.data import Dataset, Data
@@ -17,7 +17,7 @@ class ConuSubGraphDataset(Dataset):
     def __init__(
         self, root:str, 
         time_step:int, 
-        graph_manager:GraphManager, 
+        graph_manager:GraphEngine, 
         N:int, 
         attrs_dict:dict, 
         nodes_to_sample:list=[], 
@@ -67,7 +67,7 @@ class ConuSubGraphDataset(Dataset):
         if len(self.sampled_nodes) == 0:
             if self.time_recurrence:
                 # stratified sampling
-                reference_graph = graphs.build_digraph(time_steps[2], self.attrs_dict, in_place=False)            
+                reference_graph = graphs.build_digraph(time_steps[2], self.attrs_dict, persist=False)            
                 nodes_int_dict = {i:j['node_id'] for i,j in nx.convert_node_labels_to_integers(reference_graph).nodes(True)}
                 node_int_target = [j['target'] for i,j in nx.convert_node_labels_to_integers(reference_graph).nodes(True)]
                 node_int_arr = [i for i,j in nx.convert_node_labels_to_integers(reference_graph).nodes(True)]
@@ -75,7 +75,7 @@ class ConuSubGraphDataset(Dataset):
                 self.sampled_nodes = [nodes_int_dict[i] for i in sampled_nodes] 
 
                 for time in tqdm(time_steps):
-                    # graphs.build_digraph(time, self.attrs_dict, in_place=False)
+                    # graphs.build_digraph(time, self.attrs_dict, persist=False)
                     for node in [nodes_int_dict[i] for i in sampled_nodes]:
                         graphs.subgraphs_to_torch_tensors(time, node, self.attrs_dict, self.raw_dir, to_pickle=True)
             else:
@@ -85,7 +85,7 @@ class ConuSubGraphDataset(Dataset):
 
                 for time in tqdm(time_steps):
                     # stratified sampling
-                    reference_graph = graphs.build_digraph(time, self.attrs_dict, in_place=False)
+                    reference_graph = graphs.build_digraph(time, self.attrs_dict, persist=False)
                     nodes_int_dict = {i:j['node_id'] for i,j in nx.convert_node_labels_to_integers(reference_graph).nodes(True)}
                     node_int_target = np.array([j['target'] for i,j in nx.convert_node_labels_to_integers(reference_graph).nodes(True)])
                     node_int_arr = np.array([i for i,j in nx.convert_node_labels_to_integers(reference_graph).nodes(True)])
@@ -96,11 +96,11 @@ class ConuSubGraphDataset(Dataset):
 
         else:
             if self.time_recurrence:
-                reference_graph = graphs.build_digraph(time_steps[2], self.attrs_dict, in_place=False)
+                reference_graph = graphs.build_digraph(time_steps[2], self.attrs_dict, persist=False)
                 nodes_int_dict = {i:j['node_id'] for i,j in nx.convert_node_labels_to_integers(reference_graph).nodes(True)}
 
                 for time in tqdm(time_steps):
-                    # graphs.build_digraph(time, self.attrs_dict, in_place=False)
+                    # graphs.build_digraph(time, self.attrs_dict, persist=False)
                     for node in [nodo for nodo in self.sampled_nodes]:
                         graphs.subgraphs_to_torch_tensors(time, node, self.attrs_dict, self.raw_dir, to_pickle=True)
             else:
@@ -110,7 +110,7 @@ class ConuSubGraphDataset(Dataset):
 
                 for time in tqdm(time_steps):
                     # stratified sampling
-                    reference_graph = graphs.build_digraph(time, self.attrs_dict, in_place=False)
+                    reference_graph = graphs.build_digraph(time, self.attrs_dict, persist=False)
                     nodes_int_dict = {i:j['node_id'] for i,j in nx.convert_node_labels_to_integers(reference_graph).nodes(True)}
                     
                     for node in [nodo for nodo in self.sampled_nodes]:

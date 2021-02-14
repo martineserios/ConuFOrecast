@@ -22,20 +22,10 @@ from ConuForecast.src.graph_utils import GraphEngine
 # from torch.utils.data import TensorDataset, DataLoader
 # from torch_geometric.data import Dataset, Data
 
-class DBconnector():
-    """
-    Connection to the database
-    """
-    #host="172.18.0.1", port = 5555, database="base-ina", user="postgres", password="postgres"
-    def __init__(self, url: str, port: int, database: str, user: str, password: str) -> None:
-        self.pg_conn = psycopg2.connect(host=url, port=port, database=database, user=user, password=password)
-
-
 
 class TseriesManager(GraphEngine):
     def __init__(self, model:str, event:str, precip:str, conn) -> None:
         super(TseriesManager, self).__init__(model, event, precip, conn)
-
 
     def precipitation_tseries(self):
         query = f"""
@@ -91,12 +81,15 @@ class TseriesManager(GraphEngine):
         return np.array(dt_nodes)
 
 
-    def timeseries(self, item: str, vars_list:list, peak_data:bool=False):
+    def timeseries(self, item: str, vars_list:list, datetime_index:bool=False, peak_data:bool=False):
         """
         Generates the timeseries of any variable of any element.
         """
+        if datetime_index:
+            nodal_data_cols = ['elapsed_time'] + vars_list
+        else:
+            nodal_data_cols = vars_list
 
-        nodal_data_cols = ['elapsed_time'] + vars_list
         vars = ', '.join(nodal_data_cols)
 
 
@@ -367,12 +360,18 @@ class TseriesManager(GraphEngine):
             dt_nodes = dt.Frame([i for i in map(NodeVars._make, [i for i in nodal_data_result])], names=nodal_data_cols)
             
             if peak_data:
-                df = dt_nodes.loc[:, ['node_id','elapsed_time'] + vars].to_pandas()
-                dt_nodes[:, 'elapsed_time'] = pd.to_datetime(dt_nodes.loc[:,'elapsed_time'])
-                dt_nodes['time_to_peak'] = dt_nodes.iloc[(dt_nodes['depth_above_invert'].idxmax())]['elapsed_time']
-                dt_nodes['peak'] = dt_nodes['depth_above_invert'].max()
-                df = dt_nodes.set_index('elapsed_time')
-                return dt_nodes
+                if datetime_index:
+                    df = dt_nodes.loc[:, ['node_id','elapsed_time'] + vars].to_pandas()
+                    dt_nodes[:, 'elapsed_time'] = pd.to_datetime(dt_nodes.loc[:,'elapsed_time'])
+                    dt_nodes['time_to_peak'] = dt_nodes.iloc[(dt_nodes['depth_above_invert'].idxmax())]['elapsed_time']
+                    dt_nodes['peak'] = dt_nodes['depth_above_invert'].max()
+                    df = dt_nodes.set_index('elapsed_time')
+                    return dt_nodes
+                else:
+                    df = dt_nodes.loc[:, ['node_id'] + vars].to_pandas()
+                    dt_nodes['time_to_peak'] = dt_nodes.iloc[(dt_nodes['depth_above_invert'].idxmax())]['elapsed_time']
+                    dt_nodes['peak'] = dt_nodes['depth_above_invert'].max()
+                    return dt_nodes
             else:
                 return dt_nodes
 
@@ -631,7 +630,9 @@ class TseriesManager(GraphEngine):
                 df.loc[:,'elapsed_time'] = pd.to_datetime(df.loc[:,'elapsed_time'])
                 df = df.set_index('elapsed_time')
                 return df
-    
+
+
+
     # convert series to supervised learning
     def series_to_supervised(self, data, n_in=1, n_out=1, dropnan=True):
         n_vars = 1 if type(data) is list else data.shape[1]

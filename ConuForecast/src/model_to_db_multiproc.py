@@ -18,9 +18,9 @@ import multiprocessing
 
 import pyproj
 
-model_id =  'model_' + input('4-digit model_id like: 0123:    ' )
-precipitation_id ='precipitation_' + input('4-digit raingage_id like 0123:    ')
 event_id = input('4-digit event_id like: 0123:    ')
+model_id =  f'model_{event_id}'# + input('4-digit model_id like: 0123:    ' )
+precipitation_id = f'precipitation_{event_id}'# + input('4-digit raingage_id like 0123:    ')
 epsg_modelo = input('EPSG (ejemplo: 5348):    ')
 
 project_folder = os.path.abspath(os.path.join(os.getcwd(),"../.."))
@@ -1137,7 +1137,7 @@ def time_series_vars_to_db_multiproc(model_out, tipo, evento, conn, sub_set, col
         return series
     
 
-    pool = multiprocessing.Pool(8)
+    pool = multiprocessing.Pool(10)
     pool.map(time_series_vars_to_db, partes)
     pool.close()
     pool.join()
@@ -1153,29 +1153,7 @@ def out_to_db(model_out, event, engine):
             time_series_vars_to_db_multiproc(model_out, tipo, event, engine, RELEVANT_SUBCATCHMENTS, MODEL_OUT_COLS['SUBCATCHMENTS_COLS'])
 
 
-# def out_to_db(tipo, model_out, event, engine):
-#     if tipo == 'link':
-#         time_series_vars_to_db(model_out, tipo, event, engine, RELEVANT_LINKS, MODEL_OUT_COLS['LINKS_COLS'])
-#     elif tipo == 'node':
-#         time_series_vars_to_db(model_out, tipo, event, engine, RELEVANT_NODES, MODEL_OUT_COLS['NODES_COLS'])
-#     elif tipo == 'subcatchment':
-#         time_series_vars_to_db(model_out, tipo, event, engine, RELEVANT_SUBCATCHMENTS, MODEL_OUT_COLS['SUBCATCHMENTS_COLS'])
-
-
-# def multi_proc(model_out, event, engine):
-#     import multiprocessing
-#     processes = []
-#     for tipo in RELEVANT_GROUP_TYPES_OUT:
-#         t = multiprocessing.Process(target=out_to_db, args=(tipo, model_out, event, engine_base_ina))
-#         processes.append(t)
-#         t.start()
-
-
-    # for process in processes:
-    #     process.join()
-
-
-
+    
 if __name__ == "__main__":
 
     # The Session object created here will be used by the function.
@@ -1205,7 +1183,7 @@ if __name__ == "__main__":
         # update_event = False
         print('Event, model and raingage already loaded!')
 
-    # groups = {}
+    groups = {}
 
     elements =  group_start_line(model_inp).keys()
 
