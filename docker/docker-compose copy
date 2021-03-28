@@ -1,0 +1,70 @@
+version: '3.3'
+services:
+
+  jupyter:
+    build:
+      context: .
+    ports:
+       - "8888"
+    volumes:
+       - ../:/mnt
+    # entrypoint: bash -c "cd /mnt && jupyter notebook --NotebookApp.token='' --ip=0.0.0.0 --allow-root && /bin/bash"
+    entrypoint: bash -c "/bin/bash"
+    stdin_open: true
+    container_name: "ConuForecast_jupyter_${USER}"
+    tty: true
+    env_file:
+      - ../.env 
+
+  # mlflow:
+  #   build:
+  #     context: .
+  #   ports:
+  #     - "127.0.0.1::5000"
+  #   volumes:
+  #      - ../:/mnt
+  #   entrypoint: bash -c "mlflow server -h 0.0.0.0 --backend-store-uri ${MLFLOW_TRACKING_URI} --default-artifact-root ${MLFLOW_ARTIFACT_LOCATION:-'None'} -p 5000 && /bin/bash" 
+  #   stdin_open: true
+  #   container_name: "ConuForecast_mlflow_${USER}"
+  #   tty: true
+  #   env_file:
+  #     - ../.env 
+
+  # bash:
+  #   build:
+  #     context: .
+  #   volumes:
+  #      - ../:/mnt
+  #   entrypoint: "/bin/bash" 
+  #   stdin_open: true
+  #   container_name: "ConuForecast_bash_${USER}"
+  #   tty: true
+  #   env_file:
+  #     - ../.env 
+  
+  # postgres_db:
+  #   build:
+  #     context: ./db/.
+  #   ports:
+  #     - "5555:5432"
+  #   volumes:
+  #     - ./db/postgres-data:/var/lib/postgresql/data
+  #     - ./db:/docker-entrypoint-initdb.d
+  #   stdin_open: true
+  #   container_name: "ConuForecast_db_${USER}"
+  #   tty: true
+  #   env_file:
+  #     - ../.env
+
+
+
+#  postgres_client:
+#    image: dpage/pgadmin4
+#    ports:
+#      - "5050:5050"
+#    stdin_open: true
+#    container_name: "ConuForecast_db-client_${USER}"
+#    tty: true
+#    environment:
+#      - PGADMIN_DEFAULT_EMAIL=marios@fi.uba.ar
+#      - PGADMIN_DEFAULT_PASSWORD=1234567890

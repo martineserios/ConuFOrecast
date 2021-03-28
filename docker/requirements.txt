@@ -9,4 +9,3 @@ plotly
 dash
 pyproj
 ipykernel
-pickle

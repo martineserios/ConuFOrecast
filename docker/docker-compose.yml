@@ -1,67 +1,138 @@
 version: '3.3'
+
 services:
+  # postgres_db:
+  #   build:
+  #     context: ./db/.
+  #   ports:
+  #     - "5555:5432"
+  #   volumes:
+  #     - ./db/postgres-data:/var/lib/postgresql/data
+  #     - ./db:/docker-entrypoint-initdb.d
+  #   stdin_open: true
+  #   container_name: "ConuForecast_db_${USER}"
+  #   tty: true
+  #   env_file:
+  #     - ../.env
+  #   networks:
+  #     - conuforecast-app
 
   jupyter:
     build:
       context: .
     ports:
-       - "127.0.0.1::8888"
+       - "8888"
     volumes:
        - ../:/mnt
-    entrypoint: bash -c "cd /mnt && jupyter notebook --NotebookApp.token='' --ip=0.0.0.0 --allow-root && /bin/bash" 
+    # entrypoint: bash -c "cd /mnt && jupyter notebook --NotebookApp.token='' --ip=0.0.0.0 --allow-root && /bin/bash"
+    entrypoint: bash -c "/bin/bash"
     stdin_open: true
     container_name: "ConuForecast_jupyter_${USER}"
     tty: true
     env_file:
-      - ../.env 
+      - ../.env
+    networks:
+      - conuforecast-app
 
-  mlflow:
-    build:
-      context: .
-    ports:
-      - "127.0.0.1::5000"
-    volumes:
-       - ../:/mnt
-    entrypoint: bash -c "mlflow server -h 0.0.0.0 --backend-store-uri ${MLFLOW_TRACKING_URI} --default-artifact-root ${MLFLOW_ARTIFACT_LOCATION:-'None'} -p 5000 && /bin/bash" 
-    stdin_open: true
-    container_name: "ConuForecast_mlflow_${USER}"
-    tty: true
-    env_file:
-      - ../.env 
+  mlflow-db:
+      image: postgres:10.5
+      env_file:
+      - .env
+      environment:
+          POSTGRES_USER: ${POSTGRES_USER}
+          POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+          POSTGRES_DB: mlflow-db
+          POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
+          restart: always
+      volumes:
+          - mlflow-db:/var/lib/postgresql/data
+      ports:
+          - 0.0.0.0:5556:5432
+      container_name: "ConuForecast_mlflow_db"
+      networks:
+        - conuforecast-app
 
-  bash:
-    build:
-      context: .
-    volumes:
-       - ../:/mnt
-    entrypoint: "/bin/bash" 
-    stdin_open: true
-    container_name: "ConuForecast_bash_${USER}"
-    tty: true
-    env_file:
-      - ../.env 
+  waitfordb:
+      image: dadarek/wait-for-dependencies
+      depends_on:
+          - mlflow-db
+      command: mlflow-db:5556        
   
-  postgres_db:
-    build:
-      context: ./db/.
-    ports:
-      - "5555:5432"
-    volumes:
-      - ./db/postgres-data:/var/lib/postgresql/data
-      - ./db:/docker-entrypoint-initdb.d
-    stdin_open: true
-    container_name: "ConuForecast_db_${USER}"
-    tty: true
-    env_file:
-      - ../.env 
-      
-#  postgres_client:
-#    image: dpage/pgadmin4
-#    ports:
-#      - "5050:5050"
-#    stdin_open: true
-#    container_name: "ConuForecast_db-client_${USER}"
-#    tty: true
-#    environment:
-#      - PGADMIN_DEFAULT_EMAIL=marios@fi.uba.ar
-#      - PGADMIN_DEFAULT_PASSWORD=1234567890
+  mlflow-server:
+      build: mlflow/
+      ports:
+          - 0.0.0.0:5000:5000
+      env_file:
+      - .env
+      environment:
+          DB_URI: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@0.0.0.0:5556/mlflow-db
+          MLFLOW_ARTIFACT_ROOT: "${MLFLOW_ARTIFACT_ROOT}"
+          MLFLOW_TRACKING_USERNAME: "${MLFLOW_TRACKING_USERNAME}"
+          MLFLOW_TRACKING_PASSWORD: "${MLFLOW_TRACKING_PASSWORD}"
+      restart: always
+      depends_on:
+          - waitfordb
+      volumes:
+              - "/mlflow/artifacts/:${MLFLOW_ARTIFACT_ROOT}:${MLFLOW_ARTIFACT_ROOT}"
+      container_name: "ConuForecast_mlflow_server"
+      networks:
+        - conuforecast-app
+
+
+  mlflow-ui:
+      build: mlflow/
+      ports:
+          - 0.0.0.0:80:80
+      env_file:
+        - .env
+      environment:
+          DB_URI: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@0.0.0.0:5556/mlflow-db
+          MLFLOW_TRACKING_USERNAME: "${MLFLOW_TRACKING_USERNAME}"
+          MLFLOW_TRACKING_PASSWORD: "${MLFLOW_TRACKING_PASSWORD}"
+          MLFLOW_ARTIFACT_ROOT: "${MLFLOW_ARTIFACT_ROOT}"
+      restart: always
+      depends_on:
+          - mlflow-server
+      volumes:
+              - "/mlflow/artifacts/:${MLFLOW_ARTIFACT_ROOT}:${MLFLOW_ARTIFACT_ROOT}"
+      entrypoint: ./start_ui.sh
+      container_name: "ConuForecast_mlflow_ui"
+      networks:
+        - conuforecast-app
+# mlflow:
+#   build:
+#     context: .
+#   ports:
+#     - "5000"
+#   volumes:
+#       - ../:/mnt
+#   entrypoint: bash -c "mlflow server -h 0.0.0.0 --backend-store-uri ${MLFLOW_TRACKING_URI} --default-artifact-root ${MLFLOW_ARTIFACT_LOCATION:-'None'} -p 5000 && /bin/bash" 
+#   stdin_open: true
+#   container_name: "ConuForecast_mlflow_${USER}" 
+#   tty: true
+#   env_file:
+#     - ../.env 
+#   networks:
+#     - conuforecast-app
+
+
+  # bash:
+  #   build:
+  #     context: .
+  #   volumes:
+  #      - ../:/mnt
+  #   entrypoint: "/bin/bash" 
+  #   stdin_open: true
+  #   container_name: "ConuForecast_bash_${USER}"
+  #   tty: true
+  #   env_file:
+  #     - ../.env 
+
+volumes:
+    mlflow-db:
+        driver: local  
+
+
+networks:
+  conuforecast-app:
+    driver: bridge
