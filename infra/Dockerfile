@@ -14,9 +14,19 @@ RUN  wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo
 RUN  sudo apt-get update
 RUN  sudo apt-get -y install postgresql
 RUN  sudo apt -y install libpq-dev python3-dev
-RUN  pip install -U pip
-RUN  pip install -r requirements.txt
 RUN  cd /usr/local/spark/jars
 RUN  wget https://jdbc.postgresql.org/download/postgresql-42.2.18.jar
+RUN  conda create -y --name torch1.8.1-cudacu102
+ENV  PATH /opt/conda/envs/mro_env/bin:$PATH
+RUN  /bin/bash -c "source activate torch1.8.1-cudacu102"
+# RUN  conda activate torch1.8.1-cudacu102
+RUN  pip install -U pip
+RUN  pip install -r requirements.txt
+RUN  pip install torch torchvision torchaudio
+RUN  pip install torch-scatter -f https://pytorch-geometric.com/whl/torch-1.8.0+cu102.html
+RUN  pip install torch-sparse -f https://pytorch-geometric.com/whl/torch-1.8.0+cu102.html
+RUN  pip install torch-cluster -f https://pytorch-geometric.com/whl/torch-1.8.0+cu102.html
+RUN  pip install torch-spline-conv -f https://pytorch-geometric.com/whl/torch-1.8.0+cu102.html
+RUN  pip install torch-geometric
 
 WORKDIR /mnt/

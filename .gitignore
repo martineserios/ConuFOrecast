@@ -92,3 +92,7 @@ target/
 
 # Mac OS-specific storage files
 .DS_Store
+
+
+## DEFAULT ##
+/infra/db/postgres-data
