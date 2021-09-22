@@ -17,35 +17,35 @@ services:
     networks:
       - conuforecast-app
 
-  # jupyter:
-  #   runtime: nvidia
-  #   build:
-  #     context: .
-  #   ports:
-  #      - "8888"
-  #   volumes:
-  #      - ../:/mnt
-  #   # entrypoint: bash -c "cd /mnt && jupyter notebook --NotebookApp.token='' --ip=0.0.0.0 --allow-root && /bin/bash"
-  #   entrypoint: bash -c "/bin/bash"
-  #   stdin_open: true
-  #   container_name: "ConuForecast_jupyter_${USER}"
-  #   tty: true
-  #   env_file:
-  #     - ../.env
-  #   networks:
-  #     - conuforecast-app
+  jupyter:
+    # runtime: nvidia
+    build:
+      context: .
+    ports:
+       - "8888"
+    volumes:
+       - ../:/mnt
+    # entrypoint: bash -c "cd /mnt && jupyter notebook --NotebookApp.token='' --ip=0.0.0.0 --allow-root && /bin/bash"
+    entrypoint: bash -c "/bin/bash"
+    stdin_open: true
+    container_name: "ConuForecast_jupyter_${USER}"
+    tty: true
+    env_file:
+      - ../.env
+    networks:
+      - conuforecast-app
 
-  # bash:
-  #   build:
-  #     context: .
-  #   volumes:
-  #      - ../:/mnt
-  #   entrypoint: "/bin/bash" 
-  #   stdin_open: true
-  #   container_name: "ConuForecast_bash_${USER}"
-  #   tty: true
-  #   env_file:
-  #     - ../.env 
+  bash:
+    build:
+      context: .
+    volumes:
+       - ../:/mnt
+    entrypoint: "/bin/bash" 
+    stdin_open: true
+    container_name: "ConuForecast_bash_${USER}"
+    tty: true
+    env_file:
+      - ../.env 
 
 
 networks:
