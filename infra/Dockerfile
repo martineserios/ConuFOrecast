@@ -1,11 +1,11 @@
 # FROM jupyter/pyspark-notebook
 
-FROM anibali/pytorch:1.5.0-cuda10.2
-CMD nvidia-smi
+FROM ubuntu:18.04
 
 USER root
 
 #set up environment
+RUN apt-get update && apt-get -y install sudo
 RUN sudo apt-get update && apt-get install --no-install-recommends --no-install-suggests -y curl
 RUN sudo apt-get install unzip
 RUN sudo apt-get -y install python3

@@ -8,14 +8,11 @@ services:
       - "5555:5432"
     volumes:
       - ./db/postgres-data:/var/lib/postgresql/data
-      - ./db:/docker-entrypoint-initdb.d
+      # - ./db:/docker-entrypoint-initdb.d
     stdin_open: true
-    container_name: "ConuForecast_db_${USER}"
     tty: true
     env_file:
       - ../.env
-    networks:
-      - conuforecast-app
 
   jupyter:
     # runtime: nvidia
@@ -25,8 +22,8 @@ services:
        - "8888"
     volumes:
        - ../:/mnt
-    # entrypoint: bash -c "cd /mnt && jupyter notebook --NotebookApp.token='' --ip=0.0.0.0 --allow-root && /bin/bash"
-    entrypoint: bash -c "/bin/bash"
+    entrypoint: bash -c "cd /mnt && jupyter notebook --NotebookApp.token='' --ip=0.0.0.0 --allow-root && /bin/bash"
+    # entrypoint: bash -c "/bin/bash"
     stdin_open: true
     container_name: "ConuForecast_jupyter_${USER}"
     tty: true
