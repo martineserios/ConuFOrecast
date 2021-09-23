@@ -12,8 +12,8 @@ from collections import namedtuple, defaultdict
 from datetime import datetime
 
 import torch
-from torch.utils.data import TensorDataset, DataLoader
-from torch_geometric.data import Dataset, Data
+# from torch.utils.data import TensorDataset, DataLoader
+# from torch_geometric.data import Dataset, Data
 
 
 class DBconnector():
